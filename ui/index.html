@@ -1,0 +1,72 @@
+<html>
+<head>
+    <title>Hand and Foot Game</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="stylesheet" type="text/css" href="jqueryui/jquery-ui.min.css">
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <link href="https://emoji-css.afeld.me/emoji.css" rel="stylesheet">
+    <script src="jquery-3.4.1.min.js"></script>
+    <script src="jqueryui/jquery-ui.min.js"></script>
+    <script src="jquery.ui.touch-punch.min.js"></script>
+    <script src="settings.js"></script>
+    <script src="app.js"></script>
+</head>
+<body>
+    <div id="gameHeader" class="ui-corner-all">
+        <h1><span id="lblGameName" style="display:none"></span></h1>
+        <button id="btnHome" onclick="goHome()">Home</button>
+    </div>
+    <div id="appContainer">
+        <div id="discard" class="ui-state-default ui-corner-all" style="display:none"><div>DISCARD</div></div>
+        
+        <div id="startJoin" style="display:none">
+            <button id="btnStartGame" onclick="startGame()">Start</button>
+            <button id="btnJoinGame" onclick="startJoin()">Join</button>
+        </div>
+        <div id="join" style="display:none">
+            <label for="txtGameName">Game ID:</label>
+            <input id="txtGameName" />
+            <label for="txtPlayerName">What is your name:</label>
+            <input id="txtPlayerName" />
+            <button id="btnJoinPlayer" onclick="joinGame()">Join</button>
+        </div>
+        <div id="setupGame" style="display:none">
+            <div id="setupTeams"></div>
+            <button id="btnSaveTeams" onclick="saveTeams()">Save Teams</button>
+        </div>
+        <!--div id="startPlayer" style="display:none">
+            <button id="btnSaveName" onclick="storeName()">Save Name</button>
+        </div-->
+        <div id="game" style="display:none">
+            <h2><span id="lblPlayerName" style="display:none"></span></h2>
+            <h3><span id="lastPlay"></span></h3>
+            <div style="margin-bottom: 10px;">
+                <span id="gameButtons">
+                    <button id="btnUpdateScores" onclick="updateScores()" style="display:none;">Update Scores</button>
+                    <button id="btnShuffle" onclick="doShuffle()" style="display:none">Shuffle</button>
+                </span>
+                <span id="playerButtons">
+                    <button id="btnDeal" onclick="deal()" style="display:none">Deal</button>
+                    <button id="btnDraw" onclick="draw()" style="display:none">Draw</button>
+                </span>
+                <div id="playButtons" style="display:none">
+                    <button id="btnCancel" onclick="cancelStaged()">Cancel</button>
+                    <button id="btnUndo" onclick="undoStaged()">Undo</button>
+                    <button id="btnPlay" onclick="playStaged()">Play</button>
+                </div>
+            </div>
+            <ul id="playerHand"></ul>
+            <h2 id="melding" style="display:none"></h2>
+            <div id="yourTeam" class="ui-state-default ui-corner-all"></div>
+            <div id="opponents"></div>
+        </div>
+        <div id="error" style="display:none">
+            <h1 id="lblError"></h1>
+        </div>
+    </div>
+    <div id="dialog" style="display:none"></div>
+</body>
+</html>

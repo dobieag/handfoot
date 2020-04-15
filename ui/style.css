@@ -1,0 +1,368 @@
+#gameHeader {
+    height: 50px;
+}
+#gameHeader h1 {
+    margin-top: 6px;
+    margin-bottom: 0;
+    margin-left: 20px
+}
+#btnHome {
+    position: absolute;
+    right: 17px;
+    top: 17px
+}
+
+#load {
+    width: 340px;
+}
+
+#startJoin button, #join button {
+    width: 300px;
+    height: 50px;
+    margin-bottom: 10px;
+}
+
+#join {
+    align-content: center;
+}
+#join input {
+    width: 300px;
+    text-align: center;
+    font-size: 30px;
+    margin-bottom:10px;
+}
+
+#setupGame button {
+    width: 370px;
+    height: 50px;
+}
+.teamSetup label {
+    margin-left: 20px;
+}
+
+#appContainer {
+    width: 80%;
+    margin: 0 auto;
+}
+
+.ui-button {
+    padding: 5px;
+}
+
+.ui-dialog {
+    z-index: 500 !important;
+}
+
+.ui-selectmenu-open {
+    z-index: 2000;
+}
+
+.card {
+    width: 38px;
+    height: 30px;
+    padding: 0.5em;
+    border: 1px solid;
+    display: inline-block;
+}
+
+.card.red {
+    color: red;
+}
+
+.card.black {
+    color: black;
+}
+
+.card.wild {
+    color: blue;
+}
+
+.card.three {
+    border: 1px solid orange;
+}
+
+.card i {
+    float: right;
+    width: 15px;
+    height: 24px;
+}
+
+#playerHand {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    left: 0;
+    right: 10px;
+}
+
+#playerHand li {
+    margin: 0 3px 3px 3px;
+    font-size: 1.4em;
+}
+
+/*
+#playerHand li span {
+    position: absolute;
+    margin-left: -1.3em;
+}
+*/
+
+.ui-sortable-placeholder {
+    width: 60px;
+    height: 25px;
+    display: inline-block;
+}
+
+#discard {
+    width: 75px;
+    height: 75px;
+    border: 1px solid;
+    float: right;
+}
+
+#discard div {
+    padding-top: 30px;
+    padding-left: 1px;
+}
+
+.infoot {
+    text-decoration: underline;
+}
+
+.activePlayer {
+    font-weight: bold;
+    color: blue;
+}
+
+.playerOut {
+    color: orange;
+}
+
+#yourTeam {
+    background-color: lightgray;
+    padding: 5px;
+}
+
+#table {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    left: 0;
+    right: 10px;
+}
+
+#tableSpaces {
+    list-style-type: none;
+    margin: 0;
+    padding: 10px;
+    position: relative;
+    left: 0;
+    right: 10px;
+}
+
+.tableSpaces {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    left: 0;
+    right: 10px;
+}
+
+.spaceItem {
+    width: 50px;
+    height: 50px;
+    display: inline-block;
+    margin-right: 10px;
+    /*background: none !important;*/
+    margin-top: 4px;
+}
+
+.spaceItem.dirty,
+spaceItem.dirtyClosed {
+    color: white;
+}
+
+.spaceTL {
+    float: left;
+    font-size: 13px;
+    color: black;
+    background-color: yellow;
+    padding: 2px;
+}
+
+.spaceTR {
+    float: right;
+    font-size: 13px;
+    color: black;
+    background-color: #04ffd1;
+    padding: 2px;
+}
+
+.spaceMain {
+    bottom: 0;
+    margin-top: 13px;
+    font-size: 20px;
+    margin-left: 13px;
+    padding: 2px;
+    /*color: blue;*/
+    font-weight: bold;
+}
+
+.spaceBottom {
+    color: black;
+    padding-left: 15px;
+    display: inherit;
+    padding-top: 10px;
+}
+
+.staged {
+    opacity: 0.2;
+}
+
+.clean {
+    background: #f99;
+}
+
+.dirty {
+    background: #999;
+}
+
+.cleanClosed {
+    background: #f00;
+}
+
+.dirtyClosed {
+    background: #000;
+}
+
+.cardIcon {
+    background-repeat: no-repeat !important;
+    background-size: 25px 30px !important;
+}
+
+.bc {
+    background: url(icons/icons_0000_BC.jpg);
+}
+
+.bs {
+    background: url(icons/icons_0001_BS.jpg);
+}
+
+.bk {
+    background: url(icons/icons_0002_BK.jpg);
+}
+
+.bq {
+    background: url(icons/icons_0003_BQ.jpg);
+}
+
+.bj {
+    background: url(icons/icons_0004_BJ.jpg);
+}
+
+.b10 {
+    background: url(icons/icons_0005_B10.jpg);
+}
+
+.b9 {
+    background: url(icons/icons_0006_B9.jpg);
+}
+
+.b8 {
+    background: url(icons/icons_0007_B8.jpg);
+}
+
+.b7 {
+    background: url(icons/icons_0008_B7.jpg);
+}
+
+.b6 {
+    background: url(icons/icons_0009_B6.jpg);
+}
+
+.b5 {
+    background: url(icons/icons_0010_B5.jpg);
+}
+
+.b4 {
+    background: url(icons/icons_0011_B4.jpg);
+}
+
+.b3 {
+    background: url(icons/icons_0012_B3.jpg);
+}
+
+.b2 {
+    background: url(icons/icons_0013_B2.jpg);
+}
+
+.ba {
+    background: url(icons/icons_0014_BA.jpg);
+}
+
+.j {
+    background: url(icons/icons_0015_Joker.jpg);
+}
+
+.rh {
+    background: url(icons/icons_0016_RH.jpg);
+}
+
+.rd {
+    background: url(icons/icons_0017_RD.jpg);
+}
+
+.rk {
+    background: url(icons/icons_0018_RK.jpg);
+}
+
+.rq {
+    background: url(icons/icons_0019_RQ.jpg);
+}
+
+.rj {
+    background: url(icons/icons_0020_RJ.jpg);
+}
+
+.r10 {
+    background: url(icons/icons_0021_R10.jpg);
+}
+
+.r9 {
+    background: url(icons/icons_0022_R9.jpg);
+}
+
+.r8 {
+    background: url(icons/icons_0023_R8.jpg);
+}
+
+.r7 {
+    background: url(icons/icons_0024_R7.jpg);
+}
+
+.r6 {
+    background: url(icons/icons_0025_R6.jpg);
+}
+
+.r5 {
+    background: url(icons/icons_0026_R5.jpg);
+}
+
+.r4 {
+    background: url(icons/icons_0027_R4.jpg);
+}
+
+.r3 {
+    background: url(icons/icons_0028_R3.jpg);
+}
+
+.r2 {
+    background: url(icons/icons_0029_R2.jpg);
+}
+
+.ra {
+    background: url(icons/icons_0030_RA.jpg);
+}

@@ -1,0 +1,10 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "handfoot"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1mk37nkjr3u98"
+s3_prefix = "handfoot"
+region = "us-east-2"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "TableName=\"handfoot\""

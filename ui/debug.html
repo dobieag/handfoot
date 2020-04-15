@@ -1,0 +1,111 @@
+<html>
+<head>
+    <title>DEBUGGER</title>
+    <script src="jquery-3.4.1.min.js"></script>
+    <script src="settings.js"></script>
+    <script language="javascript">
+        var params={};location.search.replace(/[?&]+([^=&]+)=([^&]*)/gi,function(s,k,v){params[k]=v});
+        var socket, lastKeepalive, keepaliveTime = 30000;
+        
+        function createUUID() {
+           return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+           });
+        }
+        function basicUUID() {
+           return 'xxx-xxx'.replace(/[xy]/g, function(c) {
+              var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+           });
+        }
+        
+        $(function(){
+            if (params.hasOwnProperty("game")) {
+                joinSocket(params.game.toLowerCase(), params.userid.toLowerCase(), params.action.toLowerCase());
+            } else {
+                var url = location.origin + location.pathname + "?game=debug&userid=o-debug&action=start";
+                location.href = url;
+            }
+            
+            keepalive();
+        });
+        
+        function keepalive(){
+            setTimeout(function(){
+                if (lastKeepalive) {
+                    var gap = Date.now() - lastKeepalive;
+                    console.log("keepalive: " + gap);
+                    if (gap > keepaliveTime + 3000) {
+                        alert("keepalive didn't return fast enought!");
+                    }
+                }
+                callSocket("keepalive");
+                keepalive();
+            }, keepaliveTime);
+        }
+        
+        function callSocket(action, value){
+            socket.send(JSON.stringify({"message":"doaction", "game":params.game, "userid":params.userid, "action":action, "value":value}));
+        }
+        
+        function joinSocket(gameName, userid, action){
+            try {
+                socket = new WebSocket("wss://" + _settings.apiId + ".execute-api.us-east-2.amazonaws.com/Prod?game=" + gameName + "&userid=" + userid + "&action=" + action);
+            } catch (err) {
+                //debugger;
+            }
+            socket.onopen = (event) => {
+                callSocket("_GET_GAMES_");
+            };
+            socket.onerror = (event) => {
+                $("#error").show();
+                $("#lblError").text("Unable to connect to game: " + params.game)
+            };
+            socket.onmessage = (event) => {
+                var data = JSON.parse(event.data);
+                switch(data.info){
+                    case "keepalive":
+                    lastKeepalive = Date.now();
+                    break;
+                    case "_games_":
+                        updateGames(data.data);
+                        break;
+                    case "_game_deleted_":
+                        alert(data.data);
+                        break;
+                    case "_snapshot_":
+                        alert("snapshot created: " + data.data);
+                        break;
+                }
+            };
+        }
+        
+        function updateGames(games) {
+            $("#selGames").children().each((idx,ui) => {
+                $(ui).remove();
+            });
+            games.unshift("");
+            for (var i=0,ct=games.length; i<ct; i++) {
+                $("#selGames").append("<option>" + games[i] + "</option>");
+            }
+        }
+        
+        function snapshotGameData(){
+            var game = $("#selGames").val();
+            callSocket("_SNAPSHOT_", game);
+        }
+        function deleteGame(){
+            var game = $("#selGames").val();
+            callSocket("_DELETE_GAME_", game);
+        }
+    </script>
+</head>
+<body>
+    <div id="debugging">
+        <button onclick="snapshotGameData()">Snapshot</button>
+        <select id="selGames"></select>
+        <button onclick="deleteGame()">Delete Game</button>
+    </div>
+</body>
+</html>
