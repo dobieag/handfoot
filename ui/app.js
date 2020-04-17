@@ -1,18 +1,26 @@
+/*eslint-env es6*/ // Enables es6 error checking for that file
+/*eslint-env jquery*/ // Enables error checking for jquery functions
+/*eslint-env browser*/ // Lets you use document and other standard browser functions
+/*eslint no-console: 0*/ // Lets you use console (for example to log something)
+
+/*global settings, WebSocket, $, console */
+/* exported goHome getScore startGame startJoin joinGame deal draw cancelStaged undoStaged playStaged saveTeams displayScores */
+
 //var params={};location.search.replace(/[?&]+([^=&]+)=([^&]*)/gi,function(s,k,v){params[k]=v});
 var params = {};
-var socket, _ignoreReorder, _gameState = null,
-    _player = null,
-    _players = null,
-    _team = null,
-    _trackMeld = false,
-    _isActive = false,
-    _stageHistory = [],
-    _names = [],
-    _reorderTimeout = null,
+var socket, ignoreReorder, gameState = null,
+    player = null,
+    players = null,
+    myTeam = null,
+    trackMeld = false,
+    isActive = false,
+    stageHistory = [],
+    names = [],
+    reorderTimeout = null,
     doKeepalive = true,
     lastKeepalive,
     keepaliveTime = 30000;
-var _staged = {
+var staged = {
     "4": [],
     "5": [],
     "6": [],
@@ -27,11 +35,231 @@ var _staged = {
     "W": []
 };
 
-window.onhashchange = function () {
-    setupGameFromParams();
+/***************************************
+/  SOCKET SETUP
+***************************************/
+function callSocket(action, value) {
+    "use strict";
+    if (typeof socket !== "undefined" && socket.readyState === 1) {
+        socket.send(JSON.stringify({
+            "message": "doaction",
+            "game": params.game,
+            "userid": params.userid,
+            "action": action,
+            "value": value
+        }));
+    }
 }
 
+function setupSocket(game, userid, name, action) {
+    "use strict";
+    var key, url = "wss://" + settings.apiId + ".execute-api.us-east-2.amazonaws.com/Prod?game=" + game + "&userid=" + userid;
+    if (typeof name !== "undefined" && name !== null) {
+        url += "&name=" + name;
+    }
+    if (typeof action !== "undefined" && action !== null) {
+        url += "&action=" + action;
+    }
+    socket = new WebSocket(url);
+    socket.onopen = function () {
+        if (!params.hasOwnProperty("name")) {
+            callSocket("getPlayers");
+        } else {
+            callSocket("getPlayer");
+        }
+        if (params.hasOwnProperty("sendName")) {
+            callSocket("getPlayers"); // triggers the server to send the list of players to everyone
+            var hash = "#";
+            for (key in params) {
+                if (key !== "sendName") {
+                    hash += "&" + key + "=" + params[key];
+                }
+            }
+            location.hash = hash;
+        }
+    };
+    socket.onerror = function () {
+        $("#error").show();
+        $("#game").hide();
+        $("#start").hide();
+        $("#lblError").text("Unable to connect to game: " + params.game);
+    };
+    socket.onmessage = function (event) {
+        var i, ct, names, data = JSON.parse(event.data);
+        console.log(data.info);
+        /** START VIEW **/
+        if (params.action === "start") {
+            switch (data.info) {
+            case "state":
+                gameState = data.data;
+                $("#startJoin").dialog("close");
+                if (!data.data.teamsReady) {
+                    //$("#startJoin").dialog("open");
+                    //createTeamSelects();
+                    callSocket("getPlayers");
+                } else {
+                    $("#setupGame").dialog("close");
+                    $("#game").show();
+                }
+                break;
+            case "players":
+                /** This is the list of players that have joined */
+                updatePersonList(data.data);
+                break;
+            }
+        }
+
+        /** Global handling of data from the server **/
+        /** DO NOT callSocket in this section unless shared between start/view modes! **/
+        switch (data.info) {
+        case "keepalive":
+            lastKeepalive = Date.now();
+            break;
+        case "players":
+            players = data.data;
+            names = [];
+            for (i = 0, ct = players.length; i < ct; i = i + 1) {
+                names.push(players[i].name);
+            }
+            $("#txtPlayerName").autocomplete({
+                source: names
+            });
+            break;
+        case "state":
+            gameState = data.data;
+            if (data.data.hasOwnProperty("teams")) {
+                updateTeams(data.data.teams);
+            }
+            if (!gameState.ready && gameState.didDeal.indexOf(params.userid) === -1) {  // Empty deal list means a new game
+                $("#playerHand").children().each((idx, ui) => {
+                    $(ui).remove();
+                });
+                clearTable();
+            }
+            if (data.data.shuffled) {
+                if (player != null && !player.hasOwnProperty("hand")) {
+                    $("#btnDeal").show();
+                }
+            }
+            if (gameState.activePlayer.id != null && gameState.activeDrawer == params.userid) {
+                $("#btnDraw").show();
+            } else {
+                $("#btnDraw").hide();
+            }
+            if (gameState.activePlayer.id == params.userid && gameState.playerOut == null && player.didDraw) {
+                // It's this user's turn!
+                isActive = true;
+                $("#discard").show();
+                $("#btnPlay").show();
+            } else {
+                isActive = false;
+                $("#discard").hide();
+            }
+            if (data.data.playerOut != null) {
+                console.log(data.data.playerOut + " is out of cards!");
+                $("[data-id='" + gameState.playerOut + "']").addClass("playerOut");
+                $("#btnDraw").hide();
+                $("#discard").hide();
+                $("#btnDeal").hide();
+            }
+            if (data.data.lastMessage) {
+                $("#lastPlay").html(data.data.lastMessage);
+            }
+            if (data.data.activePlayer.id != null) {
+                $(".activePlayer").removeClass("activePlayer");
+                $('[data-id="' + data.data.activePlayer.id + '"]').addClass("activePlayer");
+            }
+            break;
+        case "playerInfo":
+            player = data.data;
+            callSocket("getState");
+            $("#lblPlayerName").html(player.name);
+            if (data.data.hasOwnProperty("hand")) {
+                $("#btnDeal").hide();
+                if (player.didDraw) {
+                    $("#discard").show();
+                }
+                displayHand(data.data.hand);
+            } else {
+                displayHand([]);
+            }
+            if (data.data.inFoot) {
+                $("#lblPlayerName").addClass("infoot");
+            } else {
+                $("#lblPlayerName").removeClass("infoot");
+            }
+            break;
+        case "playerHand":
+            /** The player received a hand update */
+            $("#btnDeal").hide();
+            $("#playerHand").show();
+            player.hand = data.data;
+            displayHand(data.data);
+            break;
+        case "scores":
+            displayScores(data.data);
+            break;
+        }
+        return;
+    };
+}
+
+function setupGameFromParams() {
+    params = {};
+    location.hash.replace(/[#&]+([^=&]+)=([^&]*)/gi, function (s, k, v) {
+        params[k] = v;
+    });
+    if (!params.hasOwnProperty("game")) {
+        if (!params.hasOwnProperty("userid")) {
+            // LOAD PAGE
+            $("#startJoin").dialog("open");
+            $("#join").dialog("close");
+        } else {
+            $("#startJoin").dialog("close");
+            $("#join").dialog("open");
+            $("#txtGameName").val("");
+            ////$("#txtGameName").focus();
+        }
+        return;
+    } else if (!params.hasOwnProperty("userid")) {
+        $("#lblGameName").text("You do not have a user ID. Please go back to the main site and join first.");
+        $("#lblGameName").show();
+        return;
+    }
+
+    if (!params.hasOwnProperty("name")) {
+        if (params.action === "start") {
+            //$("#setupGame").show();
+            $("#txtGameName").val(params.game);
+            $("#join").dialog("open");
+            ////$("#txtPlayerName").focus();
+            $("#btnJoinPlayer").button("enable");
+        }
+        //setupSocket(params.game.toLowerCase(), params.userid.toLowerCase(), null, params.action.toLowerCase());
+    } else {
+        $("#lblPlayerName").html(params.name).show();
+        if (params.action == "start") {
+            $("#join").dialog("close");
+            $("#startJoin").dialog("close");
+            $("#setupGame").dialog("open");
+            $("#setupGame").dialog("option", "title", "Teams: " + params.game);
+        } else if (params.action == "join") {
+            $("#startJoin").dialog("close");
+            $("#join").dialog("close");
+            $("#game").show();
+        }
+        setupSocket(params.game.toLowerCase(), params.userid.toLowerCase(), params.name, params.action.toLowerCase());
+    }
+    $("#lblGameName").show();
+    $("#lblGameName").text("Game Name: " + params.game.toUpperCase());
+}
+
+window.onhashchange = function () {
+    setupGameFromParams();
+};
+
 $(function () {
+    var i;
     $("#gameHeader").addClass("ui-widget-header ui-helper-clearfix");
     $("button").button();
     $("#discard").droppable({
@@ -66,22 +294,30 @@ $(function () {
     $("#setupGame").siblings(".ui-dialog-titlebar").children("button").hide();
     $("#setupGame").siblings(".ui-dialog-titlebar").removeClass("ui-draggable-handle");
 
-    $("#txtGameName").on("input", function (evt, ui) {
+    $("#scoresDialog").dialog({
+        autoOpen: false,
+        modal: true,
+        minWidth: 400,
+        maxHeight: 400,
+        title: "Scores"
+    })
+    
+    $("#txtGameName").on("input", function () {
         var game = $(this).val().replace("-", "");
         $("#btnJoinPlayer").button("disable");
         if (game.length >= 6) {
             game = game.toLowerCase().substring(0, 3) + "-" + game.toLowerCase().substring(3, 6);
             $(this).val(game);
-            var url = "wss://" + _settings.apiId + ".execute-api.us-east-2.amazonaws.com/Prod?game=" + game + "&action=test";
+            var url = "wss://" + settings.apiId + ".execute-api.us-east-2.amazonaws.com/Prod?game=" + game + "&action=test";
             var testSocket = new WebSocket(url);
-            testSocket.onopen = function(event){
+            testSocket.onopen = function(){
                 this.close();
                 $("#btnJoinPlayer").button("enable");
                 //callSocket("getPlayers");
                 params.game = $("#txtGameName").val();
                 setupSocket($("#txtGameName").val(), params.userid, null, params.action);
             }.bind(testSocket);
-            testSocket.onerror = function (error) {
+            testSocket.onerror = function () {
                 alert("game NOT started");
                 // GAME NOT STARTED
             };
@@ -90,7 +326,7 @@ $(function () {
     
     $("#txtPlayerName").autocomplete();
 
-    for (var i = 0; i < 4; i++) {
+    for (i = 0; i < 4; i++) {
         addTeamSelect();
     }
     $(".teamSetup select").selectmenu({
@@ -125,53 +361,8 @@ function goHome() {
     location.href = url;
 }
 
-function setupGameFromParams() {
-    params = {};
-    location.hash.replace(/[#&]+([^=&]+)=([^&]*)/gi, function (s, k, v) {
-        params[k] = v
-    });
-    if (!params.hasOwnProperty("game")) {
-        if (!params.hasOwnProperty("userid")) {
-            // LOAD PAGE
-            $("#startJoin").dialog("open");
-            $("#join").dialog("close");
-        } else {
-            $("#startJoin").dialog("close");
-            $("#join").dialog("open");
-            $("#txtGameName").val("");
-            ////$("#txtGameName").focus();
-        }
-        return;
-    } else if (!params.hasOwnProperty("userid")) {
-        $("#lblGameName").text("You do not have a user ID. Please go back to the main site and join first.");
-        $("#lblGameName").show();
-        return;
-    }
-
-    if (!params.hasOwnProperty("name")) {
-        if (params.action == "start") {
-            //$("#setupGame").show();
-            $("#txtGameName").val(params.game);
-            $("#join").dialog("open");
-            ////$("#txtPlayerName").focus();
-            $("#btnJoinPlayer").button("enable");
-        }
-        //setupSocket(params.game.toLowerCase(), params.userid.toLowerCase(), null, params.action.toLowerCase());
-    } else {
-        $("#lblPlayerName").html(params.name).show();
-        if (params.action == "start") {
-            $("#join").dialog("close");
-            $("#setupGame").dialog("open");
-            $("#setupGame").dialog("option", "title", "Teams: " + params.game);
-        } else if (params.action == "join") {
-            $("#startJoin").dialog("close");
-            $("#join").dialog("close");
-            $("#game").show();
-        }
-        setupSocket(params.game.toLowerCase(), params.userid.toLowerCase(), params.name, params.action.toLowerCase());
-    }
-    $("#lblGameName").show();
-    $("#lblGameName").text("Game Name: " + params.game.toUpperCase());
+function getScore() {
+    callSocket("getScores");
 }
 
 function startGame() {
@@ -200,12 +391,12 @@ function joinGame() {
     }
     var name = $("#txtPlayerName").val();
     var userid = params.userid;
-    if (_players != null) {
-        for (var i=0,ct=_players.length; i<ct; i++) {
-            if (_players[i].name == $("#txtPlayerName").val()) {
-                //alert("chose name " + _players[i].id);
+    if (players != null) {
+        for (var i=0,ct=players.length; i<ct; i++) {
+            if (players[i].name == $("#txtPlayerName").val()) {
+                //alert("chose name " + players[i].id);
                 callSocket("deletePlayer", params.userid);
-                userid = _players[i].id;
+                userid = players[i].id;
                 action = params.action; // remove sendName parameter so it doesn't create another user
             }
         }
@@ -217,19 +408,21 @@ function joinGame() {
 /***************************************
 /*  PLAYER FUNCTIONS
 /***************************************/
+/*
 function storeName() {
     var name = $("#txtPlayerName").val();
     name = name.trim();
     var url = location.origin + location.pathname + "#game=" + params.game + "&userid=" + params.userid + "&name=" + name + "&action=" + params.action + "#sendName";
     location.href = url;
 }
+*/
 
 function deal() {
     callSocket("deal");
 }
 
 function draw() {
-    _player.didDraw = true;
+    player.didDraw = true;
     $("#btnDraw").hide();
     //$("#discard").show();
     callSocket("draw");
@@ -239,6 +432,17 @@ function displayHand(data) {
     $("#playerHand").children().each((id, el) => {
         $(el).remove();
     });
+    var cardOrder = ["4","5","6","7","8","9","10","J","Q","K","A","2","3"];
+    var maxIdx = -1;
+    data.sort((a, b) => {
+        var aName = a.name, bName = b.name;
+        if (aName == "J" && a.suit == null)
+            aName = "2";
+        if (bName == "J" && b.suit == null)
+            bName = "2";
+        if (a.idx > maxIdx) maxIdx = a.idx;
+        if (b.idx > maxIdx) maxIdx = b.idx;
+        return cardOrder.indexOf(aName) > cardOrder.indexOf(bName) ? 1 : -1});
     data.map(card => {
         //var cardVal = card.suit != null ? card.name + card.suit : card.name;
         var cardVal = card.name;
@@ -255,6 +459,9 @@ function displayHand(data) {
         } else if (card.suit == "S") {
             $('<i class="em em-spades" aria-role="presentation" aria-label="BLACK CLUB SUIT"></i>').appendTo(c);
         }
+        if (card.idx == maxIdx || card.idx == maxIdx-1) {
+            c.addClass("new");
+        }
         if ((card.name == "J" && card.suit == null) || card.name == "2")
             c.addClass("wild");
         else if (card.suit == "H" || card.suit == "D")
@@ -263,8 +470,8 @@ function displayHand(data) {
             c.addClass("black");
         if (card.name == "3")
             c.addClass("three");
-        for (var i = 0, ct = _stageHistory.length; i < ct; i++) {
-            if (_stageHistory[i].dropped.id == card.id) {
+        for (var i = 0, ct = stageHistory.length; i < ct; i++) {
+            if (stageHistory[i].dropped.id == card.id) {
                 c.addClass("staged");
                 break;
             }
@@ -275,42 +482,42 @@ function displayHand(data) {
         //    console.log("starting to drag: " + $(ui.item).data("value") );
         //},
         placeholder: "ui-state-highlight",
-        start: (event, ui) => {
-            if (_reorderTimeout != null) {
-                clearTimeout(_reorderTimeout);
+        start: () => {
+            if (reorderTimeout != null) {
+                clearTimeout(reorderTimeout);
                 console.log("clearing old timeout");
             }
         },
-        update: (event, ui) => {
+        update: () => {
             var vals = [];
-            var items = $("#playerHand").children().each((idx, el) => {
+            $("#playerHand").children().each((idx, el) => {
                 vals.push($(el).data("value"));
             });
             //console.log(vals);
-            if (!_ignoreReorder) {
+            if (!ignoreReorder) {
                 callSocket("reorder", vals);
             }
-            _ignoreReorder = false;
+            ignoreReorder = false;
         }
     });
     $("#playerHand").disableSelection();
 }
 
 function cardDropped(event, ui) {
-    if (_player.inFoot) {
+    if (player.inFoot) {
         if ($(".card").length - $(".card.staged").length == 1) {
             $("#dialog").text("You can't play the last card from your foot. You need to discard it.").dialog();
             return;
         }
     }
-    if (!_player.didDraw) {
+    if (!player.didDraw) {
         $("#dialog").text("You can't play cards because you haven't drawn yet.").dialog();
         return;
-    } else if (!_player.didDraw) {
+    } else if (!player.didDraw) {
         $("#dialog").text("Please draw first.").dialog();
         return;
     }
-    _ignoreReorder = true;
+    ignoreReorder = true;
     var dropped = $(ui.draggable).data("value");
     if ($(ui.draggable).hasClass("staged")) {
         // user is re-dragging a previously staged card :(
@@ -320,9 +527,9 @@ function cardDropped(event, ui) {
     if (dropped.name == droppedOn || dropped.name == "2" || (dropped.name == "J" && dropped.suit == null)) {
         if (droppedOn != "W") {
             if (dropped.name == "2" || (dropped.name == "J" && dropped.suit == null)) {
-                var playedCards = ([]).concat(_staged[droppedOn]);
-                var nonWild = _team.played[droppedOn].clean;
-                var wild = _team.played[droppedOn].wild;
+                var playedCards = ([]).concat(staged[droppedOn]);
+                var nonWild = myTeam.played[droppedOn].clean;
+                var wild = myTeam.played[droppedOn].wild;
                 for (var i = 0, ct = playedCards.length; i < ct; i++) {
                     if (playedCards[i].name == droppedOn) {
                         nonWild++;
@@ -336,14 +543,14 @@ function cardDropped(event, ui) {
                 }
             }
         }
-        if (_isActive) {
+        if (isActive) {
             $("#playButtons").show();
             $("#btnPlay").show();
         } else {
             $("#playButtons").show();
             $("#btnPlay").hide();
         }
-        _stageHistory.push({
+        stageHistory.push({
             "dropped": dropped,
             "on": droppedOn
         });
@@ -355,11 +562,11 @@ function cardDropped(event, ui) {
         } else {
             tl.text(parseInt(tl.text()) + 1);
         }
-        _staged[droppedOn].push(dropped);
-        updateCards(_team.played);
+        staged[droppedOn].push(dropped);
+        updateCards(myTeam.played);
         $("#discard").hide();
     }
-    //console.log(_team.cards);
+    //console.log(myTeam.cards);
 }
 
 function updateCards(played) {
@@ -367,15 +574,15 @@ function updateCards(played) {
     for (var key in played) {
         //var space = $("#space_" + key);
         var space = $("#yourTeam").find(".space_" + key);
-        var sCt = _staged[key].length != 0 ? _staged[key].length : "";
+        var sCt = staged[key].length != 0 ? staged[key].length : "";
         var pCt = played[key].clean + played[key].wild;
         pCt = pCt != 0 ? pCt : "";
         $(space.children(".spaceTL")[0]).text(sCt);
         $(space.children(".spaceTR")[0]).text(pCt);
         space.removeClass("clean dirty cleanClosed dirtyClosed");
 
-        //var allCards = [].concat(_staged[key]).concat(played[key].played);
-        var allCards = [].concat(_staged[key]);
+        //var allCards = [].concat(staged[key]).concat(played[key].played);
+        var allCards = [].concat(staged[key]);
         if (allCards.length + played[key].clean + played[key].wild > 0) {
             var clean = played[key].wild == 0;
             var cCt = played[key].clean;
@@ -400,10 +607,10 @@ function updateCards(played) {
             }
         }
 
-        if (_trackMeld) {
-            for (var i = 0, ct = _staged[key].length; i < ct; i++) {
+        if (trackMeld) {
+            for (i = 0, ct = staged[key].length; i < ct; i++) {
                 var cardScore = 5;
-                var card = _staged[key][i];
+                var card = staged[key][i];
                 if (card.name == "J" && card.suit == null) {
                     score += 50;
                 } else {
@@ -419,42 +626,42 @@ function updateCards(played) {
 
 function updateMelding(score) {
     var meldAmt = 50;
-    if (_team.score > 1995) meldAmt = 90;
-    if (_team.score > 3995) meldAmt = 120;
-    if (_team.score > 5995) meldAmt = 150;
-    if (_team.score > 7995) meldAmt = 190;
+    if (myTeam.score > 1995) meldAmt = 90;
+    if (myTeam.score > 3995) meldAmt = 120;
+    if (myTeam.score > 5995) meldAmt = 150;
+    if (myTeam.score > 7995) meldAmt = 190;
     $("#melding").text("Melding: " + score + "/" + meldAmt);
 }
 
 function cancelStaged() {
-    _stageHistory = [];
+    stageHistory = [];
     $("#playButtons").hide();
     $("#discard").show();
-    for (var key in _staged) {
-        if (_staged[key].length > 0) {
+    for (var key in staged) {
+        if (staged[key].length > 0) {
             $("#space_" + key).removeClass("clean dirty cleanClosed dirtyClosed");
-            _staged[key] = [];
+            staged[key] = [];
             $("#space_" + key + " .spaceBottom").html("&nbsp;");
         }
     }
-    updateCards(_team.played);
+    updateCards(myTeam.played);
     $(".staged").removeClass("staged");
 }
 
 function undoStaged() {
-    var last = _stageHistory.pop();
-    var dropped = _staged[last.on].pop();
-    var staged = $(".card.staged");
-    for (var i = 0, ct = staged.length; i < ct; i++) {
-        if ($(staged[i]).data("value").id == dropped.id) {
-            $(staged[i]).removeClass("staged");
+    var last = stageHistory.pop();
+    var dropped = staged[last.on].pop();
+    var stagedDiv = $(".card.staged");
+    for (var i = 0, ct = stagedDiv.length; i < ct; i++) {
+        if ($(stagedDiv[i]).data("value").id == dropped.id) {
+            $(stagedDiv[i]).removeClass("staged");
             break;
         }
     }
     var space = $("#space_" + last.on);
     space.removeClass("clean dirty cleanClosed dirtyClosed");
-    updateCards(_team.played);
-    if (_stageHistory.length == 0) {
+    updateCards(myTeam.played);
+    if (stageHistory.length == 0) {
         $("#discard").show();
         $("#playButtons").hide();
     }
@@ -463,22 +670,22 @@ function undoStaged() {
 function playStaged() {
     var hasClean = false;
     var hasDirty = false;
-    for (var key in _staged) {
-        var allCards = [].concat(_staged[key]);
-        var cardLen = allCards.length + _team.played[key].clean + _team.played[key].wild;
+    for (var key in staged) {
+        var allCards = [].concat(staged[key]);
+        var cardLen = allCards.length + myTeam.played[key].clean + myTeam.played[key].wild;
         if (cardLen > 0 && cardLen < 3) {
             $("#dialog").text("Card " + key + " must have more than 3 cards to start the book.").dialog();
             return;
         }
     }
-    if (_player.inFoot && ($(".card").length - $(".card.staged").length == 1)) {
+    if (player.inFoot && ($(".card").length - $(".card.staged").length == 1)) {
         // User has one card left from foot that's not staged
         // check if there's a closed clean and dirty book
-        for (key in _staged) {
-            allCards = [].concat(_staged[key]);
-            var cardCount = allCards.length + _team.played[key].clean + _team.played[key].wild;
+        for (key in staged) {
+            allCards = [].concat(staged[key]);
+            var cardCount = allCards.length + myTeam.played[key].clean + myTeam.played[key].wild;
             if (cardCount >= 7) {
-                var isClean = _team.played[key].wild == 0;
+                var isClean = myTeam.played[key].wild == 0;
                 if (isClean) {
                     for (var i = 0, ct = allCards.length; i < ct; i++) {
                         var c = allCards[i];
@@ -500,13 +707,13 @@ function playStaged() {
     // If rechead here then all started books have the correct number of cards
     hasClean = false;
     hasDirty = false;
-    if (_trackMeld) {
+    if (trackMeld) {
         var score = 0;
-        for (var key in _staged) {
-            if (_staged[key].length > 0) {
-                var isClean = true;
-                for (var i = 0, ct = _staged[key].length; i < ct; i++) {
-                    var c = _staged[key][i];
+        for (key in staged) {
+            if (staged[key].length > 0) {
+                isClean = true;
+                for (i = 0, ct = staged[key].length; i < ct; i++) {
+                    c = staged[key][i];
                     var cardScore = 5;
                     if ((c.name == "J" && c.suit == null) || c.name == "2") {
                         isClean = false;
@@ -528,21 +735,21 @@ function playStaged() {
             return;
         }
         var meldAmt = 50;
-        if (_team.score > 1995) meldAmt = 90;
-        if (_team.score > 3995) meldAmt = 120;
-        if (_team.score > 5995) meldAmt = 150;
-        if (_team.score > 7995) meldAmt = 190;
+        if (myTeam.score > 1995) meldAmt = 90;
+        if (myTeam.score > 3995) meldAmt = 120;
+        if (myTeam.score > 5995) meldAmt = 150;
+        if (myTeam.score > 7995) meldAmt = 190;
         if (score < meldAmt) {
             $("#dialog").text("You did not meet the minimum score to meld.").dialog();
             return;
         }
     }
-    _stageHistory = [];
+    stageHistory = [];
     $("#playButtons").hide();
     $("#discard").show();
-    callSocket("play", _staged);
-    for (var key in _staged){
-        _staged[key] = [];
+    callSocket("play", staged);
+    for (key in staged){
+        staged[key] = [];
     }
     $(".spaceTL").text("");
 }
@@ -553,20 +760,19 @@ function playStaged() {
 function addTeamSelect() {
     var teamCt = $(".teamSetup").length;
     var teamIdx = teamCt + 1;
-    var team = $("<div class='teamSetup'></div>");
-    team.append("<div>Team " + teamIdx + "</div>");
-    team.append("<label>Name: </label>");
-    var sel = $("<select class='cbPlayer'></select>").appendTo(team);
+    var t = $("<div class='teamSetup'></div>");
+    t.append("<div>Team " + teamIdx + "</div>");
+    t.append("<label>Name: </label>");
+    var sel = $("<select class='cbPlayer'></select>").appendTo(t);
     sel.selectmenu({
         width: 100
     });
-    team.append("<label>Name: </label>");
-    sel = $("<select class='cbPlayer'></select>").appendTo(team);
+    t.append("<label>Name: </label>");
+    sel = $("<select class='cbPlayer'></select>").appendTo(t);
     sel.selectmenu({
         width: 100
     });
-    $("#setupTeams").append(team);
-    //updatePersonList(_names);
+    $("#setupTeams").append(t);
 }
 
 function saveTeams() {
@@ -596,214 +802,24 @@ function saveTeams() {
         callSocket("saveTeams", teams);
 }
 
-/***************************************
-/*  SOCKET SETUP
-/***************************************/
-function setupSocket(game, userid, name, action) {
-    //alert("setting up socket: " + userid + "  " + name);
-    var url = "wss://" + _settings.apiId + ".execute-api.us-east-2.amazonaws.com/Prod?game=" + game + "&userid=" + userid;
-    if (typeof name != "undefined" && name != null) {
-        url += "&name=" + name;
-    }
-    if (typeof action != "undefined" && action != null) {
-        url += "&action=" + action;
-    }
-    socket = new WebSocket(url);
-    socket.onopen = (event) => {
-        if (!params.hasOwnProperty("name")) {
-            callSocket("getPlayers");
-        } else {
-            callSocket("getPlayer");
-        }
-        if (params.hasOwnProperty("sendName")) {
-            callSocket("getPlayers"); // triggers the server to send the list of players to everyone
-            var hash = "#";
-            for (var key in params) {
-                if (key != "sendName") {
-                    hash += "&" + key + "=" + params[key];
-                }
-            }
-            location.hash = hash;
-        }
-        if (params.action == "start") {
-
-        } else if (params.action == "view") {
-
-        }
-    };
-    socket.onerror = function (error) {
-        $("#error").show();
-        $("#game").hide();
-        $("#start").hide();
-        $("#lblError").text("Unable to connect to game: " + params.game)
-    };
-    socket.onmessage = function (event) {
-        var data = JSON.parse(event.data);
-        console.log(data.info);
-        /** START VIEW **/
-        if (params.action == "start") {
-            switch (data.info) {
-                case "state":
-                    _gameState = data.data;
-                    if (_gameState.playerOut != null) {
-                        $("#btnUpdateScores").show();
-                    }
-                    if (data.data.shuffled) {
-                        $("#btnShuffle").hide();
-                    }
-                    $("#startJoin").dialog("close");
-                    if (!data.data.teamsReady) {
-                        $("#startJoin").dialog("open");
-                        //createTeamSelects();
-                        callSocket("getPlayers");
-                    } else {
-                        $("#setupGame").dialog("close");
-                        if (!data.data.shuffled && data.data.playerOut == null) {
-                            $("#btnShuffle").show();
-                        }
-                        $("#game").show();
-                    }
-                    break;
-                case "players":
-                    /** This is the list of players that have joined */
-                    updatePersonList(data.data);
-                    break;
-            }
-        }
-
-        /** Global handling of data from the server **/
-        /** DO NOT callSocket in this section unless shared between start/view modes! **/
-        switch (data.info) {
-            case "keepalive":
-                lastKeepalive = Date.now();
-                break;
-            case "players":
-                _players = data.data;
-                var names = [];
-                for (var i=0, ct=_players.length; i<ct; i++) {
-                    names.push(_players[i].name);
-                }
-                $("#txtPlayerName").autocomplete({
-                    source: names
-                });
-                break;
-            case "state":
-                _gameState = data.data;
-                if (data.data.hasOwnProperty("teams")) {
-                    updateTeams(data.data.teams);
-                }
-                if (!_gameState.ready && _gameState.didDeal.indexOf(params.userid) == -1) {  // Empty deal list means a new game
-                    $("#playerHand").children().each((idx, ui) => {
-                        $(ui).remove();
-                    });
-                    clearTable();
-                }
-                if (data.data.shuffled) {
-                    if (_player != null && !_player.hasOwnProperty("hand")) {
-                        $("#btnDeal").show();
-                    }
-                }
-                if (_gameState.activePlayer.id != null && _gameState.activeDrawer == params.userid) {
-                    $("#btnDraw").show();
-                } else {
-                    $("#btnDraw").hide();
-                }
-                if (_gameState.activePlayer.id == params.userid && _gameState.playerOut == null && _player.didDraw) {
-                    // It's this user's turn!
-                    _isActive = true;
-                    $("#discard").show();
-                    $("#btnPlay").show();
-                } else {
-                    _isActive = false;
-                    $("#discard").hide();
-                }
-                if (data.data.playerOut != null) {
-                    console.log(data.data.playerOut + " is out of cards!");
-                    $("[data-id='" + _gameState.playerOut + "']").addClass("playerOut");
-                    $("#btnDraw").hide();
-                    $("#discard").hide();
-                    $("#btnDeal").hide();
-                }
-                if (data.data.lastMessage) {
-                    $("#lastPlay").html(data.data.lastMessage);
-                }
-                if (data.data.activePlayer.id != null) {
-                    $(".activePlayer").removeClass("activePlayer");
-                    $('[data-id="' + data.data.activePlayer.id + '"]').addClass("activePlayer");
-                }
-                if (_gameState.teamsReady) {
-                    //Teams are setup so get them
-                    //callSocket("getTeams");
-                }
-                break;
-                //            case "teams":
-                //                $("#game").show();
-                //                if (data.data.length > 0) {
-                //                    updateTeams(data.data);
-                //                }
-                //                break;
-                //            case "team":
-                //                updateTeam(data.data);
-                //                break;
-            case "playerInfo":
-                _player = data.data;
-                callSocket("getState");
-                $("#lblPlayerName").html(_player.name);
-                if (data.data.hasOwnProperty("hand")) {
-                    $("#btnDeal").hide();
-                    if (_player.didDraw) {
-                        $("#discard").show();
-                    }
-                    displayHand(data.data.hand);
-                } else {
-                    displayHand([]);
-                }
-                if (data.data.inFoot) {
-                    $("#lblPlayerName").addClass("infoot");
-                } else {
-                    $("#lblPlayerName").removeClass("infoot");
-                }
-                break;
-            case "playerHand":
-                /** The player received a hand update */
-                $("#btnDeal").hide();
-                $("#playerHand").show();
-                _player.hand = data.data;
-                displayHand(data.data);
-                break;
-        }
-        return;
-    };
-}
-
-function callSocket(action, value) {
-    if (typeof socket != "undefined" && socket.readyState == 1) {
-        socket.send(JSON.stringify({
-            "message": "doaction",
-            "game": params.game,
-            "userid": params.userid,
-            "action": action,
-            "value": value
-        }));
-    }
-}
-
+/*
 function doShuffle() {
     callSocket("shuffle");
 }
+*/
 
-function updatePersonList(names) {
-    //_names = names;
-    for (var i = 0, ct = names.length; i < ct; i++) {
+function updatePersonList(allNames) {
+    //names = names;
+    for (var i = 0, ct = allNames.length; i < ct; i++) {
         var found = false;
-        for (var j = 0, jCt = _names.length; j < jCt; j++) {
-            if (_names[j].id == names[i].id) {
+        for (var j = 0, jCt = names.length; j < jCt; j++) {
+            if (names[j].id == allNames[i].id) {
                 found = true;
                 break;
             }
         }
         if (!found) {
-            _names.push(names[i]);
+            names.push(allNames[i]);
         }
     }
     $(".cbPlayer option").each(function () {
@@ -813,10 +829,10 @@ function updatePersonList(names) {
         "name": "",
         id: "0"
     }];
-    for (var i = 0, ct = _names.length; i < ct; i++) {
-        tNames.push(_names[i]);
+    for (i = 0, ct = names.length; i < ct; i++) {
+        tNames.push(names[i]);
     }
-    for (var i = 0, ct = tNames.length; i < ct; i++) {
+    for (i = 0, ct = tNames.length; i < ct; i++) {
         $(".cbPlayer").each(function () {
             $(this).append($("<option value='" + tNames[i].id + "'>" + tNames[i].name + "</option>"));
         });
@@ -830,7 +846,7 @@ function clearTable() {
     $(".tableSpaces .spaceItem .spaceTR").text("");
     $(".tableSpaces .spaceItem .spaceBottom").text("");
     $(".infoot").removeClass("infoot");
-    delete _player.hand;
+    delete player.hand;
 }
 
 
@@ -842,36 +858,29 @@ function updateTeams(teams) {
     }
     ts.sort((a, b) => (a.index > b.index) ? 1 : -1)
     for (var i = 0, ct = ts.length; i < ct; i++) {
-        var team = ts[i];
-        updateTeam(team);
+        var t = ts[i];
+        updateTeam(t);
     }
-    //for (i=teams.length; i<3; i++) {
-    //    var t = $(".team")[i];
-    //    $(t).remove();
-    //}
 }
 
 function updateTeam(team) {
     //var t = $(".team")[team.index];
     var t = $('[data-tid="' + team.subId + '"]')
     var playerTeam, placeTeamIn;
-    if (_player == null) {
-        alert("_player is null!");
+    if (player == null) {
+        alert("player is null!");
     }
-    if (_player != null && team.ids.indexOf(_player.subId) > -1) {
+    if (player != null && team.ids.indexOf(player.subId) > -1) {
         placeTeamIn = "#yourTeam";
         playerTeam = true;
-        _team = team;
-        if (!_team.melded) {
-            _trackMeld = true;
+        myTeam = team;
+        if (!myTeam.melded) {
+            trackMeld = true;
             $("#melding").show();
             updateMelding(0);
         } else {
-            _trackMeld = false;
+            trackMeld = false;
             $("#melding").hide();
-        }
-        if (_team.score != 0) {
-            $("#btnShuffle").hide();
         }
     } else {
         playerTeam = false;
@@ -928,7 +937,7 @@ function updateTeam(team) {
             $("<div></div>").html("&nbsp;").addClass("spaceBottom").appendTo(item);
             tSpaces.append(item);
         } else {
-            var tl = _staged[spaces[s]].length;
+            var tl = staged[spaces[s]].length;
             tl = tl == 0 ? "" : tl;
             $(tableSpaces).children(".space_" + spaces[s] + " .spaceTL").text(tl);
             $(tableSpaces).children(".space_" + spaces[s] + " .spaceTR").text(team.played[spaces[s]].clean + team.played[spaces[s]].wild);
@@ -939,23 +948,23 @@ function updateTeam(team) {
 }
 
 function updateTeamCards(team, cards) {
-    var team = $($('[data-tid="' + team.subId + '"]').children(".tableSpaces")[0]);
+    var t = $($('[data-tid="' + team.subId + '"]').children(".tableSpaces")[0]);
     for (var key in cards) {
         if (cards[key] == null) {
             break;
         }
-        var space = $(team.children(".space_" + key)[0]);
+        var space = $(t.children(".space_" + key)[0]);
         var pCt = cards[key].clean + cards[key].wild;
         pCt = pCt != 0 ? pCt : "";
         if (cards[key].clean > 0) {
             var clean = true;
-            var suffix = _staged[key].length + cards[key].clean + cards[key].wild >= 7 ? "Closed" : "";
+            var suffix = staged[key].length + cards[key].clean + cards[key].wild >= 7 ? "Closed" : "";
             if (cards[key].wild > 0) clean = false;
             if (key === "W") {
                 clean = true;
             } else {
-                for (var i=0,ct = _staged[key].length; i<ct; i++) {
-                    var card = _staged[key][i];
+                for (var i=0,ct = staged[key].length; i<ct; i++) {
+                    var card = staged[key][i];
                     if (card.name == "2" || (card.name == "J" && card.suit == null)) {
                         clean = false;
                     }
@@ -976,40 +985,62 @@ function updateTeamCards(team, cards) {
 }
 
 function updateTeamLabels(team) {
-    if (_gameState.playerOut != null) {
-        $("[data-id='" + _gameState.playerOut + "']").addClass("playerOut");
+    if (gameState.playerOut != null) {
+        $("[data-id='" + gameState.playerOut + "']").addClass("playerOut");
     }
-    var t = $('[data-tid="' + team.subId + '"]').children(".infoot").removeClass("infoot");
+    $('[data-tid="' + team.subId + '"]').children(".infoot").removeClass("infoot");
     for (var i = 0, ct = team.inFoot.length; i < ct; i++) {
         $('[data-id="' + team.inFoot[i] + '"]').addClass("infoot");
     }
-    for (var i = 0, ct = team.ids.length; i < ct; i++) {
+    for (i = 0, ct = team.ids.length; i < ct; i++) {
         $('[data-cardCt="' + team.ids[i] + '"]').text(team.cardCt[i]);
     }
     $(".activePlayer").removeClass("activePlayer");
-    $('[data-id="' + _gameState.activePlayer.id + '"]').addClass("activePlayer");
-}
-
-function updateScores() {
-    callSocket("updateScores");
-    $("#btnUpdateScores").hide();
+    $('[data-id="' + gameState.activePlayer.id + '"]').addClass("activePlayer");
 }
 
 function discardDrop(event, ui) {
     $("#discard").hide();
-    _ignoreReorder = true;
-    _player.didDraw = false;
+    ignoreReorder = true;
+    player.didDraw = false;
     $(ui.draggable).hide();
     var discarded = $(ui.draggable).data("value");
     callSocket("discard", discarded);
 }
 
-function createUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = Math.random() * 16 | 0,
-            v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
+function displayScores(data) {
+    $("#scoresDialog").children().each((idx, ui) => {
+        $(ui).remove();
     });
+    for (var i=0, ct=data.length; i<ct; i++) {
+        var t = data[i];
+        var tName = "<h2>";
+        for (var j=0, jCt=t.playerNames.length; j<jCt; j++) {
+            tName += t.playerNames[j];
+            if (j < jCt-1 && jCt > 1) {
+                tName += " & ";
+            }
+        }
+        tName += " : " + t.score;
+        tName += "</h2>";
+        $("#scoresDialog").append(tName);
+        
+        var roundDiv = $("<div></div>").addClass("round");
+        for (j=t.scores.length-1; j>=0; j--) {
+            var round = t.scores[j];
+            var roundScore = round.scores[0].score + round.scores[1].score;
+            $("<h3>Round: " + round.round + "</h3>").appendTo(roundDiv);
+            $("<div>Base: " + round.scores[0].score + "</div>").appendTo(roundDiv);
+            $("<div>Cards: " + round.scores[1].score + "</div>").appendTo(roundDiv);
+            for (var k=2, kCt=round.scores.length; k<kCt; k++) {
+                $("<div>" + round.scores[k].type.split("-").join(" ") + ": " + round.scores[k].score + "</div>").appendTo(roundDiv);
+                roundScore += round.scores[k].score;
+            }
+            $("<div><b>Round Score: " + roundScore + "</b></div>").appendTo(roundDiv);
+        }
+        $("#scoresDialog").append(roundDiv);
+    }
+    $("#scoresDialog").dialog("open");
 }
 
 function basicUUID() {

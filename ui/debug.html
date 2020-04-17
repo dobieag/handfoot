@@ -51,7 +51,7 @@
         
         function joinSocket(gameName, userid, action){
             try {
-                socket = new WebSocket("wss://" + _settings.apiId + ".execute-api.us-east-2.amazonaws.com/Prod?game=" + gameName + "&userid=" + userid + "&action=" + action);
+                socket = new WebSocket("wss://" + settings.apiId + ".execute-api.us-east-2.amazonaws.com/Prod?game=" + gameName + "&userid=" + userid + "&action=" + action);
             } catch (err) {
                 //debugger;
             }

@@ -378,3 +378,18 @@ exports.updateScores = async (gameId) => {
     gameData.state.shuffled = false;
     await db.setDataByItem(gameData);
 }
+
+exports.getScores = async (gameId) => {
+    var teams = await team.getAll(gameId);
+    for (var i=0, ct=teams.length; i<ct; i++) {
+        var t = teams[i];
+        for (var key in t) {
+            //console.log(key);
+            if (key != "playerNames" && key != "score" && key != "scores") {
+                //console.log("DELETING KEY: " + key);
+                delete t[key];
+            }
+        }
+    }
+    return teams;
+}

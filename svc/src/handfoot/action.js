@@ -35,6 +35,9 @@ exports.doAction = async eventData => {
         case "getState":
             postDatas = await module.exports.getState(eventData);
             break;
+        case "getScores":
+            postDatas = await module.exports.getScores(eventData);
+            break;
         case "shuffle":
             postDatas = await module.exports.shuffle(eventData);
             break;
@@ -141,6 +144,11 @@ exports.deletePlayer = async eventData => {
 exports.getState = async eventData => {
     var state = await game.getState(eventData.game);
     return [{ "info": "state", "to": eventData.userid, "data": state }];
+}
+
+exports.getScores = async eventData => {
+    var scores = await game.getScores(eventData.game);
+    return [{ "info": "scores", "to": eventData.userid, "data": scores }];
 }
 
 exports.getTeams = async eventData => {

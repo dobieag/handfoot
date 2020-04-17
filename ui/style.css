@@ -6,6 +6,11 @@
     margin-bottom: 0;
     margin-left: 20px
 }
+#btnScore {
+    position: absolute;
+    right: 95px;
+    top: 17px
+}
 #btnHome {
     position: absolute;
     right: 17px;
@@ -79,6 +84,12 @@
 
 .card.three {
     border: 1px solid orange;
+}
+.card.three.new {
+    border: 3px solid orange;
+}
+.card.new {
+    border: 3px solid;
 }
 
 .card i {

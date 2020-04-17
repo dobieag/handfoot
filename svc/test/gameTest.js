@@ -1,4 +1,5 @@
 const game = require("../src/handfoot/game");
+const action = require("../src/handfoot/action");
 const team = require("../src/handfoot/team");
 const db = require("../src/handfoot/db");
 const player = require("../src/handfoot/player");
@@ -106,14 +107,14 @@ async function doTest() {
     // postDatas.push({ "info": "state", "to": "all", "data": state });
 
     // wss://l6xhw95zuk.execute-api.us-east-2.amazonaws.com/Prod?game=48b-697&action=test
-    var gameId = "8d3-a4b";
+    var gameId = "023-500";
     var userId;
     var connectionId;
     var name;
-    var action = "test";
+    //var action = "test";
     //await game.connect(gameId, userId, connectionId, name, action);
     // await game.shuffle(gameId);
-    console.log(await game.getState(gameId));
+    console.log(await action.doAction({"message":"doaction","game":"023-500","userid":"p-281-974","action":"getScores"}));
 }
 
 doTest();

@@ -17,6 +17,7 @@
 <body>
     <div id="gameHeader" class="ui-corner-all">
         <h1><span id="lblGameName" style="display:none"></span></h1>
+        <button id="btnScore" onclick="getScore()">Score</button>
         <button id="btnHome" onclick="goHome()">Home</button>
     </div>
     <div id="appContainer">
@@ -37,17 +38,10 @@
             <div id="setupTeams"></div>
             <button id="btnSaveTeams" onclick="saveTeams()">Save Teams</button>
         </div>
-        <!--div id="startPlayer" style="display:none">
-            <button id="btnSaveName" onclick="storeName()">Save Name</button>
-        </div-->
         <div id="game" style="display:none">
             <h2><span id="lblPlayerName" style="display:none"></span></h2>
             <h3><span id="lastPlay"></span></h3>
             <div style="margin-bottom: 10px;">
-                <span id="gameButtons">
-                    <button id="btnUpdateScores" onclick="updateScores()" style="display:none;">Update Scores</button>
-                    <button id="btnShuffle" onclick="doShuffle()" style="display:none">Shuffle</button>
-                </span>
                 <span id="playerButtons">
                     <button id="btnDeal" onclick="deal()" style="display:none">Deal</button>
                     <button id="btnDraw" onclick="draw()" style="display:none">Draw</button>
@@ -68,5 +62,6 @@
         </div>
     </div>
     <div id="dialog" style="display:none"></div>
+    <div id="scoresDialog" style="display:none"></div>
 </body>
 </html>
