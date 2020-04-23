@@ -53,18 +53,18 @@ exports.save = async (gameid, teamList) => {
             "cardCt": cardCt,
             "index": index,
             "cards": {
-                "4": { "played": [] },
-                "5": { "played": [] },
-                "6": { "played": [] },
-                "7": { "played": [] },
-                "8": { "played": [] },
-                "9": { "played": [] },
-                "10": { "played": [] },
-                "J": { "played": [] },
-                "Q": { "played": [] },
-                "K": { "played": [] },
-                "A": { "played": [] },
-                "W": { "played": [] }
+                "4": [],
+                "5": [],
+                "6": [],
+                "7": [],
+                "8": [],
+                "9": [],
+                "10": [],
+                "J": [],
+                "Q": [],
+                "K": [],
+                "A": [],
+                "W": []
             }
         };
         teams.push(team);
@@ -85,31 +85,6 @@ exports.save = async (gameid, teamList) => {
                 await db.setDataByItem(players[j]);
             }
         }
-
-        gameData.state.teams[teamid] = {
-            "played":{
-                "4":null,
-                "5":null,
-                "6":null,
-                "7":null,
-                "8":null,
-                "9":null,
-                "10":null,
-                "J":null,
-                "K":null,
-                "Q":null,
-                "A":null,
-                "W":null
-            },
-            subId: teamid,
-            cardCt: cardCt,
-            ids: ids,
-            melded: false,
-            names: names,
-            index: index,
-            score: 0,
-            inFoot: []
-        };
     }
 
     gameData.state.teamsReady = true;
@@ -126,3 +101,51 @@ exports.save = async (gameid, teamList) => {
     return teams;
 }
 
+exports.getOverview = async (gameId) => {
+    var rslt = {};
+    var teams = await db.getFilteredData(gameId, "t-");
+    for (var i=0,ct=teams.length; i<ct; i++) {
+        var team = teams[i];
+        var cardCt = [];
+        var names = [];
+        var inFoot = [];
+        for (var pIdx=0,pCt=team.playerIds.length; pIdx<pCt; pIdx++) {
+            var p = await player.get(gameId, team.playerIds[pIdx]);
+            //console.log(p);
+            if (p.hasOwnProperty("hand")) {
+                cardCt.push(p.hand.length);
+            } else {
+                cardCt.push(0);
+            }
+            names.push(p.name);
+            inFoot.push(p.inFoot ? p.subId : "");
+        }
+        rslt[team.subId] = {
+            cardCt: cardCt,
+            ids: team.playerIds,
+            index: team.index,
+            inFoot: inFoot,
+            melded: team.melded,
+            names: names,
+            played: {},
+            score: team.score,
+            subId: team.subId
+        };
+        for (var cardName in team.cards) {
+            rslt[team.subId].played[cardName] = {"clean":0, "wild":0};
+            for (c=0,cct=team.cards[cardName].length; c<cct; c++) {
+                var card = team.cards[cardName][c];
+                if (card.name == "2" || (card.name == "J" && card.suit == null)) {
+                    if (cardName == "W") {
+                        rslt[team.subId].played[cardName].clean++;
+                    } else {
+                        rslt[team.subId].played[cardName].wild++
+                    }
+                } else {
+                    rslt[team.subId].played[cardName].clean++;
+                }
+            }
+        }
+    }
+    return rslt;
+}

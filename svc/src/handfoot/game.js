@@ -171,15 +171,7 @@ exports.deleteGameData = async (gameId) => {
 
     for (var i = 0, ct = gameData.length; i < ct; i++) {
         var item = gameData[i];
-        var params = {
-            TableName: process.env.TABLE_NAME,
-            FilterExpression: "#gi = :gameId",
-            Key: {
-                "gameId": gameId,
-                "subId": item.subId
-            }
-        };
-        await db.delete(params);
+        await db.deleteData(gameId, item.subId);
     }
 
     var games = await db.getData("_GAMES_", "_GAMES_");
@@ -194,6 +186,8 @@ exports.getState = async (gameid) => {
         data.state.activePlayer.name = activePlayer.name;
         data.state.activePlayer.inFoot = activePlayer.inFoot;
     }
+    console.log("getting Team Overview");
+    data.state.teams = await team.getOverview(gameid);
     return data.state;
 }
 
@@ -238,16 +232,6 @@ exports.shuffle = async (gameid) => {
         gameData.state.firstPlayer = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.firstPlayer) + 1) % gameData.playOrder.length];
         var firstPlayer = await db.getData(gameid, gameData.state.firstPlayer);
         gameData.state.lastMessage = "NEW Round! " + firstPlayer.name + " starts!";
-    }
-    for (var teamId in  gameData.state.teams) {
-        var team = gameData.state.teams[teamId];
-        for (var key in team.played) {
-            team.played[key] = {"clean":0, "wild":0};
-            team.inFoot = [];
-            for (var i=0; i<team.cardCt.length; i++) {
-                team.cardCt[i] = 0;
-            }
-        }
     }
     await db.setDataByItem(gameData);
     
@@ -294,9 +278,9 @@ exports.updateScores = async (gameId) => {
         for (var key in t.cards) {
             var card = t.cards[key];
             var clean = true;
-            if (card.played.length >= 7) {
-                for (var i = 0, ct = card.played.length; i < ct; i++) {
-                    var c = card.played[i];
+            if (card.length >= 7) {
+                for (var i = 0, ct = card.length; i < ct; i++) {
+                    var c = card[i];
                     if ((c.name == "2" || c.name == "J") && key != "W") { // Otherwise the wild book is going to always mark as dirty
                         clean = false;
                     }
@@ -320,14 +304,13 @@ exports.updateScores = async (gameId) => {
         var playedCards = [];
         for (var key in t.cards) {
             var card = t.cards[key];
-            for (var i = 0, ct = card.played.length; i < ct; i++) {
-                var c = card.played[i];
+            for (var i = 0, ct = card.length; i < ct; i++) {
+                var c = card[i];
                 handScore += cardScore(c, false);
-                //playedCards.push(c.name + (c.suit != null ? c.suit : ""));
                 playedCards.push(c);
             }
             /** Clean out the remaining cards so they don't get rescored if UpdateScores is called again */
-            card.played = [];
+            t.cards[key] = [];
         }
         scoreLog.scores.push({ "type": "playedCards", "score": handScore, "cards": playedCards });
         t.score += handScore;
@@ -363,9 +346,6 @@ exports.updateScores = async (gameId) => {
         t.inFoot = [];
         t.melded = false;
         await db.setDataByItem(t);
-
-        gameData.state.teams[t.subId].score = t.score;
-        gameData.state.teams[t.subId].melded = false;
 
         console.log("SCORE LOG:", scoreLog);
     }

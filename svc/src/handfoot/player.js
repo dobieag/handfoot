@@ -30,14 +30,7 @@ exports.get = async (gameId, userId) => {
 }
 
 exports.delete = async (gameId, userId) => {
-    var params = {
-        TableName: process.env.TABLE_NAME,
-        Key: {
-            "gameId": gameId,
-            "subId": userId
-        }
-    };
-    await db.delete(params);
+    await db.deleteData(gameId, userId);
 
     var tables = await db.getData(gameId, "tables");
     tables.tables.splice(tables.tables.indexOf(userId), 1);
@@ -58,19 +51,18 @@ exports.deal = async (gameid, userid) => {
     for (var i = 0, ct = players.length; i < ct; i++) {
         var player = players[i];
         if (player.subId === userid) {
-            player.hand = hand;
-            player.foot = foot;
-            player.didDraw = false;
-            player.canDraw = false;
-            gameData.state.didDeal.push(player.subId);
-            await db.setDataByItem(player);
+            if (gameData.state.didDeal.indexOf(player.subId) == -1) {
+                player.hand = hand;
+                player.foot = foot;
+                player.didDraw = false;
+                player.canDraw = false;
+                gameData.state.didDeal.push(player.subId);
+                await db.setDataByItem(player);
 
-            var t = await db.getData(gameid, player.teamid);
-            t.cardCt[t.playerIds.indexOf(player.subId)] = player.hand.length;
-            await db.setDataByItem(t);
-
-            var teamPlayerIdx = gameData.state.teams[player.teamid].ids.indexOf(player.subId);
-            gameData.state.teams[player.teamid].cardCt[teamPlayerIdx] = player.hand.length;
+                var t = await db.getData(gameid, player.teamid);
+                t.cardCt[t.playerIds.indexOf(player.subId)] = player.hand.length;
+                await db.setDataByItem(t);
+            }
         }
     };
     await db.setDataByItem(gameData);
@@ -98,9 +90,6 @@ exports.draw = async (gameid, userid) => {
     player.hand.push(drawPile.shift());
     player.hand.push(drawPile.shift());
     await db.setDataByItem(player);
-
-    var teamPlayerIdx = gameData.state.teams[player.teamid].ids.indexOf(player.subId);
-    gameData.state.teams[player.teamid].cardCt[teamPlayerIdx] = player.hand.length;
 
     var nextDrawerId = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.lastDrawer) + 1) % gameData.playOrder.length];
     var nextDrawer = await db.getData(gameid, nextDrawerId);
@@ -141,16 +130,13 @@ exports.discard = async (gameid, userid, card) => {
         player.hand = player.foot;
         player.foot = [];
         player.inFoot = true;
-        gameData.state.teams[player.teamid].inFoot.push(player.subId);
         t.inFoot.push(player.subId);
 
         gameData.state.lastMessage = player.name + " discarded " + card.name + (card.suit != null ? card.suit : "") + " and went into their foot!";
     } else {
         gameData.state.lastMessage = player.name + " discarded " + card.name + (card.suit != null ? card.suit : "");
     }
-    var teamPlayerIdx = gameData.state.teams[player.teamid].ids.indexOf(player.subId);
-    gameData.state.teams[player.teamid].cardCt[teamPlayerIdx] = player.hand.length;
-
+    
     t.cardCt[t.playerIds.indexOf(player.subId)] = player.hand.length;
     await db.setDataByItem(t);
     player.didDraw = false;
@@ -203,28 +189,13 @@ exports.play = async (gameid, userid, cards) => {
     console.log(cards);
     var t = await db.getData(gameid, p.teamid);
     t.melded = true;
-    gameData.state.teams[p.teamid].melded = true;
     for (var key in cards) {
         console.log(key);
         for (var c = 0, cct = cards[key].length; c < cct; c++) {
             var card = cards[key][c];
-            t.cards[key].played.push(card);
+            t.cards[key].push(card);
             p.hand.splice(getCardIndex(p.hand, card), 1);
             log += "Switched card to played: " + card + "\n";
-        }
-        gameData.state.teams[p.teamid].played[key].clean = 0;
-        gameData.state.teams[p.teamid].played[key].wild = 0;
-        for (c=0,cct=t.cards[key].played.length; c<cct; c++) {
-            var card = t.cards[key].played[c];
-            if (card.name == "2" || (card.name == "J" && card.suit == null)) {
-                if (key == "W") {
-                    gameData.state.teams[p.teamid].played[key].clean++;
-                } else {
-                    gameData.state.teams[p.teamid].played[key].wild++
-                }
-            } else {
-                gameData.state.teams[p.teamid].played[key].clean++;
-            }
         }
     }
 
@@ -234,15 +205,11 @@ exports.play = async (gameid, userid, cards) => {
         p.foot = [];
         p.inFoot = true;
         t.inFoot.push(p.subId);
-        gameData.state.teams[p.teamid].inFoot.push(p.subId);
         playedIntoHand = true;
 
         gameData.state.lastMessage = p.name + " played into their foot!";
     }
     t.cardCt[t.playerIds.indexOf(p.subId)] = p.hand.length;
-
-    var teamPlayerIdx = gameData.state.teams[p.teamid].ids.indexOf(p.subId);
-    gameData.state.teams[p.teamid].cardCt[teamPlayerIdx] = p.hand.length;
 
     await db.setDataByItem(p);
     await db.setDataByItem(t);

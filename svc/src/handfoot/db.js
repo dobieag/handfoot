@@ -35,7 +35,7 @@ exports.setDataByItem = async (item) => {
 
 exports.setData = async (data) => {
   //if (data.Item.gameId != "debug") {
-    await ddb.put(data).promise();
+  await ddb.put(data).promise();
   //}
 }
 
@@ -54,4 +54,16 @@ exports.getFilteredData = async (gameId, name) => {
 
 exports.delete = async (params) => {
   await ddb.delete(params).promise();
+}
+
+exports.deleteData = async (gameId, subId) => {
+  var params = {
+    TableName: process.env.TABLE_NAME,
+    FilterExpression: "#gi = :gameId",
+    Key: {
+      "gameId": gameId,
+      "subId": subId
+    }
+  };
+  await module.exports.delete(params);
 }

@@ -185,7 +185,8 @@ exports.saveTeams = async eventData => {
 }
 
 exports.shuffle = async eventData => {
-    var state = await game.shuffle(eventData.game);
+    await game.shuffle(eventData.game);
+    var state = await game.getState(eventData.game);
     return [{ "info": "state", "to": "all", "data": state }];
 }
 
@@ -199,7 +200,8 @@ exports.updateScores = async eventData => {
     //var teams = await team.getAll(eventData.game);
     //postDatas.push({ "info": "teams", "to": "all", "data": teams });
     //var state = await game.getState(eventData.game);
-    var state = await game.shuffle(eventData.game);
+    await game.shuffle(eventData.game);
+    var state = await game.getState(eventData.game);
     postDatas.push({ "info": "state", "to": "all", "data": state });
     return postDatas;
 }

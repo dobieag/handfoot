@@ -14,26 +14,33 @@ var socket, ignoreReorder, gameState = null,
     myTeam = null,
     trackMeld = false,
     isActive = false,
-    stageHistory = [],
+    //stageHistory = [],
     names = [],
-    reorderTimeout = null,
     doKeepalive = true,
     lastKeepalive,
     keepaliveTime = 30000;
-var staged = {
-    "4": [],
-    "5": [],
-    "6": [],
-    "7": [],
-    "8": [],
-    "9": [],
-    "10": [],
-    "J": [],
-    "Q": [],
-    "K": [],
-    "A": [],
-    "W": []
-};
+
+function cleanLocal() {
+    var keys = Object.keys(localStorage);
+    for (var i=0; i<keys.length; i++) {
+        if (keys[i].indexOf(params.game) === -1) {
+            localStorage.removeItem(keys[i]);
+        }
+    }
+}
+
+function getLocal(suffix) {
+    var rslt = JSON.parse(localStorage.getItem(params.game + "_" + params.userid + "_" + suffix));
+    return rslt;
+}
+
+function setLocal(suffix, data) {
+    localStorage.setItem(params.game + "_" + params.userid + "_" + suffix, JSON.stringify(data));
+}
+
+const CARDS = "CARDS",
+      STAGED = "STAGED",
+      STAGE_HISTORY = "STAGE_HISTORY";
 
 /***************************************
 /  SOCKET SETUP
@@ -94,8 +101,8 @@ function setupSocket(game, userid, name, action) {
                 gameState = data.data;
                 $("#startJoin").dialog("close");
                 if (!data.data.teamsReady) {
-                    //$("#startJoin").dialog("open");
-                    //createTeamSelects();
+                    $("#setupGame").dialog("open");
+                    $("#setupGame").dialog("option", "title", "Teams: " + params.game);
                     callSocket("getPlayers");
                 } else {
                     $("#setupGame").dialog("close");
@@ -179,6 +186,13 @@ function setupSocket(game, userid, name, action) {
                 if (player.didDraw) {
                     $("#discard").show();
                 }
+                var cards = getLocal(CARDS);
+                if (cards === null) {
+                    setLocal(CARDS, data.data.hand);
+                } else {
+                    cards = updateLocalCards(data.data.hand);
+                    data.data.hand = cards;
+                }
                 displayHand(data.data.hand);
             } else {
                 displayHand([]);
@@ -193,8 +207,9 @@ function setupSocket(game, userid, name, action) {
             /** The player received a hand update */
             $("#btnDeal").hide();
             $("#playerHand").show();
-            player.hand = data.data;
-            displayHand(data.data);
+            var hand = updateLocalCards(data.data);
+            player.hand = hand;
+            displayHand(hand);
             break;
         case "scores":
             displayScores(data.data);
@@ -227,6 +242,24 @@ function setupGameFromParams() {
         return;
     }
 
+    // params.game exists so it's a good time to set up some of the base local data:
+    cleanLocal();
+    setLocal(STAGED, {
+        "4": [],
+        "5": [],
+        "6": [],
+        "7": [],
+        "8": [],
+        "9": [],
+        "10": [],
+        "J": [],
+        "Q": [],
+        "K": [],
+        "A": [],
+        "W": []
+    });
+    setLocal(STAGE_HISTORY, []);
+    
     if (!params.hasOwnProperty("name")) {
         if (params.action === "start") {
             //$("#setupGame").show();
@@ -241,8 +274,6 @@ function setupGameFromParams() {
         if (params.action == "start") {
             $("#join").dialog("close");
             $("#startJoin").dialog("close");
-            $("#setupGame").dialog("open");
-            $("#setupGame").dialog("option", "title", "Teams: " + params.game);
         } else if (params.action == "join") {
             $("#startJoin").dialog("close");
             $("#join").dialog("close");
@@ -418,6 +449,7 @@ function storeName() {
 */
 
 function deal() {
+    $("#btnDeal").hide();
     callSocket("deal");
 }
 
@@ -434,6 +466,7 @@ function displayHand(data) {
     });
     var cardOrder = ["4","5","6","7","8","9","10","J","Q","K","A","2","3"];
     var maxIdx = -1;
+    /*
     data.sort((a, b) => {
         var aName = a.name, bName = b.name;
         if (aName == "J" && a.suit == null)
@@ -443,6 +476,7 @@ function displayHand(data) {
         if (a.idx > maxIdx) maxIdx = a.idx;
         if (b.idx > maxIdx) maxIdx = b.idx;
         return cardOrder.indexOf(aName) > cardOrder.indexOf(bName) ? 1 : -1});
+    */
     data.map(card => {
         //var cardVal = card.suit != null ? card.name + card.suit : card.name;
         var cardVal = card.name;
@@ -470,12 +504,14 @@ function displayHand(data) {
             c.addClass("black");
         if (card.name == "3")
             c.addClass("three");
+        var stageHistory = getLocal("STAGE_HISTORY");
         for (var i = 0, ct = stageHistory.length; i < ct; i++) {
             if (stageHistory[i].dropped.id == card.id) {
                 c.addClass("staged");
                 break;
             }
         }
+        setLocal("STAGE_HISTORY", stageHistory);
     });
     $("#playerHand").sortable({
         //start: (event, ui) => {
@@ -483,10 +519,6 @@ function displayHand(data) {
         //},
         placeholder: "ui-state-highlight",
         start: () => {
-            if (reorderTimeout != null) {
-                clearTimeout(reorderTimeout);
-                console.log("clearing old timeout");
-            }
         },
         update: () => {
             var vals = [];
@@ -495,7 +527,13 @@ function displayHand(data) {
             });
             //console.log(vals);
             if (!ignoreReorder) {
-                callSocket("reorder", vals);
+                if (typeof(Storage) !== "undefined") {
+                    // store data in local storage instead
+                    setLocal(CARDS, vals);
+                }
+            } else {
+                var hand = getLocal(CARDS);
+                displayHand(hand);
             }
             ignoreReorder = false;
         }
@@ -524,6 +562,7 @@ function cardDropped(event, ui) {
         return;
     }
     var droppedOn = $(this).data("value");
+    var staged = getLocal(STAGED);
     if (dropped.name == droppedOn || dropped.name == "2" || (dropped.name == "J" && dropped.suit == null)) {
         if (droppedOn != "W") {
             if (dropped.name == "2" || (dropped.name == "J" && dropped.suit == null)) {
@@ -550,10 +589,12 @@ function cardDropped(event, ui) {
             $("#playButtons").show();
             $("#btnPlay").hide();
         }
+        var stageHistory = getLocal(STAGE_HISTORY);
         stageHistory.push({
             "dropped": dropped,
             "on": droppedOn
         });
+        setLocal(STAGE_HISTORY, stageHistory);
 
         $(ui.draggable).addClass("staged");
         var tl = $($(this).children(".spaceTL")[0]);
@@ -563,14 +604,47 @@ function cardDropped(event, ui) {
             tl.text(parseInt(tl.text()) + 1);
         }
         staged[droppedOn].push(dropped);
+        setLocal(STAGED, staged);
         updateCards(myTeam.played);
         $("#discard").hide();
     }
     //console.log(myTeam.cards);
 }
 
+function updateLocalCards(fromServer) {
+    var hand = getLocal(CARDS);
+    for (var i=0,ct=fromServer.length; i<ct; i++) {
+        var foundInHand = false;
+        for (var j=0; j<hand.length; j++) {
+            if (fromServer[i].id == hand[j].id) {
+                foundInHand = true;
+                break;
+            }
+        }
+        if (!foundInHand) {
+            hand.push(fromServer[i]);
+        }
+    }
+    for (i=0; i<hand.length; i++) {
+        var foundOnServer = false;
+        for (j=0; j<fromServer.length; j++) {
+            if (fromServer[j].id == hand[i].id) {
+                foundOnServer = true;
+                break;
+            }
+        }
+        if (!foundOnServer) {
+            hand.splice(i, 1);
+            i--;
+        }
+    }
+    setLocal(CARDS, hand);
+    return hand;
+}
+
 function updateCards(played) {
     var score = 0;
+    var staged = getLocal(STAGED);
     for (var key in played) {
         //var space = $("#space_" + key);
         var space = $("#yourTeam").find(".space_" + key);
@@ -634,7 +708,9 @@ function updateMelding(score) {
 }
 
 function cancelStaged() {
-    stageHistory = [];
+    //stageHistory = [];
+    setLocal(STAGE_HISTORY, []);
+    var staged = getLocal(STAGED);
     $("#playButtons").hide();
     $("#discard").show();
     for (var key in staged) {
@@ -644,11 +720,14 @@ function cancelStaged() {
             $("#space_" + key + " .spaceBottom").html("&nbsp;");
         }
     }
+    setLocal(STAGED, staged);
     updateCards(myTeam.played);
     $(".staged").removeClass("staged");
 }
 
 function undoStaged() {
+    var stageHistory = getLocal(STAGE_HISTORY);
+    var staged = getLocal(STAGED);
     var last = stageHistory.pop();
     var dropped = staged[last.on].pop();
     var stagedDiv = $(".card.staged");
@@ -665,11 +744,13 @@ function undoStaged() {
         $("#discard").show();
         $("#playButtons").hide();
     }
+    setLocal(STAGE_HISTORY, stageHistory);
 }
 
 function playStaged() {
     var hasClean = false;
     var hasDirty = false;
+    var staged = getLocal(STAGED);
     for (var key in staged) {
         var allCards = [].concat(staged[key]);
         var cardLen = allCards.length + myTeam.played[key].clean + myTeam.played[key].wild;
@@ -744,13 +825,14 @@ function playStaged() {
             return;
         }
     }
-    stageHistory = [];
+    setLocal(STAGE_HISTORY, []);
     $("#playButtons").hide();
     $("#discard").show();
     callSocket("play", staged);
     for (key in staged){
         staged[key] = [];
     }
+    setLocal(STAGED, staged);
     $(".spaceTL").text("");
 }
 
@@ -866,6 +948,7 @@ function updateTeams(teams) {
 function updateTeam(team) {
     //var t = $(".team")[team.index];
     var t = $('[data-tid="' + team.subId + '"]')
+    var staged = getLocal(STAGED);
     var playerTeam, placeTeamIn;
     if (player == null) {
         alert("player is null!");
@@ -948,6 +1031,7 @@ function updateTeam(team) {
 }
 
 function updateTeamCards(team, cards) {
+    var staged = getLocal(STAGED);
     var t = $($('[data-tid="' + team.subId + '"]').children(".tableSpaces")[0]);
     for (var key in cards) {
         if (cards[key] == null) {
