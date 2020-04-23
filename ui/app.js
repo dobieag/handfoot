@@ -38,6 +38,14 @@ function setLocal(suffix, data) {
     localStorage.setItem(params.game + "_" + params.userid + "_" + suffix, JSON.stringify(data));
 }
 
+function hasStaged(){
+    var stage_history = getLocal(STAGE_HISTORY);
+    if (stage_history.length > 0) {
+        return true;
+    }
+    return false;
+}
+
 const CARDS = "CARDS",
       STAGED = "STAGED",
       STAGE_HISTORY = "STAGE_HISTORY";
@@ -156,7 +164,9 @@ function setupSocket(game, userid, name, action) {
             if (gameState.activePlayer.id == params.userid && gameState.playerOut == null && player.didDraw) {
                 // It's this user's turn!
                 isActive = true;
-                $("#discard").show();
+                if (!hasStaged()) {
+                    $("#discard").show();
+                }
                 $("#btnPlay").show();
             } else {
                 isActive = false;
@@ -183,7 +193,9 @@ function setupSocket(game, userid, name, action) {
             $("#lblPlayerName").html(player.name);
             if (data.data.hasOwnProperty("hand")) {
                 $("#btnDeal").hide();
-                if (player.didDraw) {
+                var staged = getLocal(STAGED);
+                
+                if (player.didDraw && !hasStaged()) {
                     $("#discard").show();
                 }
                 var cards = getLocal(CARDS);
@@ -244,21 +256,30 @@ function setupGameFromParams() {
 
     // params.game exists so it's a good time to set up some of the base local data:
     cleanLocal();
-    setLocal(STAGED, {
-        "4": [],
-        "5": [],
-        "6": [],
-        "7": [],
-        "8": [],
-        "9": [],
-        "10": [],
-        "J": [],
-        "Q": [],
-        "K": [],
-        "A": [],
-        "W": []
-    });
-    setLocal(STAGE_HISTORY, []);
+    var staged = getLocal(STAGED);
+    if (staged == null) {
+        setLocal(STAGED, {
+            "4": [],
+            "5": [],
+            "6": [],
+            "7": [],
+            "8": [],
+            "9": [],
+            "10": [],
+            "J": [],
+            "Q": [],
+            "K": [],
+            "A": [],
+            "W": []
+        });
+    }
+    var stageHistory = getLocal(STAGE_HISTORY);
+    if (stageHistory == null) {
+        setLocal(STAGE_HISTORY, []);
+    } else if (hasStaged()) {
+        $("#playButtons").show();
+        $("#discard").hide();
+    }
     
     if (!params.hasOwnProperty("name")) {
         if (params.action === "start") {
@@ -715,9 +736,9 @@ function cancelStaged() {
     $("#discard").show();
     for (var key in staged) {
         if (staged[key].length > 0) {
-            $("#space_" + key).removeClass("clean dirty cleanClosed dirtyClosed");
+            $("#yourTeam").find(".space_" + key).removeClass("clean dirty cleanClosed dirtyClosed");
             staged[key] = [];
-            $("#space_" + key + " .spaceBottom").html("&nbsp;");
+            $("#yourTeam").find(".space_" + key + " .spaceBottom").html("&nbsp;");
         }
     }
     setLocal(STAGED, staged);
@@ -737,14 +758,16 @@ function undoStaged() {
             break;
         }
     }
-    var space = $("#space_" + last.on);
+    setLocal(STAGED, staged);
+    setLocal(STAGE_HISTORY, stageHistory);
+
+    var space = $("#yourTeam").find(".space_" + last.on);
     space.removeClass("clean dirty cleanClosed dirtyClosed");
     updateCards(myTeam.played);
     if (stageHistory.length == 0) {
         $("#discard").show();
         $("#playButtons").hide();
     }
-    setLocal(STAGE_HISTORY, stageHistory);
 }
 
 function playStaged() {
@@ -1013,14 +1036,16 @@ function updateTeam(team) {
                     });
             }
             if (playerTeam) {
-                $("<div></div>").addClass("spaceTL").appendTo(item);
+                var tl = staged[spaces[s]].length;
+                tl = tl == 0 ? "" : tl;
+                $("<div>" + tl + "</div>").addClass("spaceTL").appendTo(item);
             }
             $("<div></div>").addClass("spaceTR").appendTo(item);
             $("<div>" + spaces[s] + "</div>").addClass("spaceMain").appendTo(item);
             $("<div></div>").html("&nbsp;").addClass("spaceBottom").appendTo(item);
             tSpaces.append(item);
         } else {
-            var tl = staged[spaces[s]].length;
+            tl = staged[spaces[s]].length;
             tl = tl == 0 ? "" : tl;
             $(tableSpaces).children(".space_" + spaces[s] + " .spaceTL").text(tl);
             $(tableSpaces).children(".space_" + spaces[s] + " .spaceTR").text(team.played[spaces[s]].clean + team.played[spaces[s]].wild);
@@ -1042,6 +1067,8 @@ function updateTeamCards(team, cards) {
         pCt = pCt != 0 ? pCt : "";
         if (cards[key].clean > 0) {
             var clean = true;
+            var stagedClean = staged[key].length;
+            var stagedWild = 0;
             var suffix = staged[key].length + cards[key].clean + cards[key].wild >= 7 ? "Closed" : "";
             if (cards[key].wild > 0) clean = false;
             if (key === "W") {
@@ -1051,6 +1078,8 @@ function updateTeamCards(team, cards) {
                     var card = staged[key][i];
                     if (card.name == "2" || (card.name == "J" && card.suit == null)) {
                         clean = false;
+                        stagedClean--;
+                        stagedWild++;
                     }
                 }
             }
@@ -1060,7 +1089,7 @@ function updateTeamCards(team, cards) {
                 space.addClass("clean" + suffix);
             } else {
                 space.addClass("dirty" + suffix);
-                space.children(".spaceBottom").text(cards[key].clean + "/" + cards[key].wild);
+                space.children(".spaceBottom").text((cards[key].clean + stagedClean) + "/" + (cards[key].wild + stagedWild));
             }
         }
 
