@@ -11,8 +11,14 @@
     <script src="jquery-3.4.1.min.js"></script>
     <script src="jqueryui/jquery-ui.min.js"></script>
     <script src="jquery.ui.touch-punch.min.js"></script>
-    <script src="settings.js"></script>
-    <script src="app.js"></script>
+    <script>
+        $(function(){
+            // load settings and app JS files this way to do a cache buster
+            $.getScript("settings.js", function(){
+                $.getScript("app.js", function(){});
+            });
+        });
+    </script>
 </head>
 <body>
     <div id="gameHeader" class="ui-corner-all">
@@ -63,5 +69,8 @@
     </div>
     <div id="dialog" style="display:none"></div>
     <div id="scoresDialog" style="display:none"></div>
+    <audio id="tadaF">
+        <source src="sounds/397354_plasterbrain_tada-fanfare-f.m4a" type="audio/mpeg"/>
+    </audio>
 </body>
 </html>

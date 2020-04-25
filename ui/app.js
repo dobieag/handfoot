@@ -15,6 +15,7 @@ var socket, ignoreReorder, gameState = null,
     trackMeld = false,
     isActive = false,
     //stageHistory = [],
+    lastMessage = null,
     names = [],
     doKeepalive = true,
     lastKeepalive,
@@ -181,6 +182,10 @@ function setupSocket(game, userid, name, action) {
             }
             if (data.data.lastMessage) {
                 $("#lastPlay").html(data.data.lastMessage);
+                if (data.data.lastMessage.indexOf("into their foot") > -1 && data.data.lastMessage != lastMessage) {
+                    $("#tadaF").trigger('play');
+                }
+                lastMessage = data.data.lastMessage;
             }
             if (data.data.activePlayer.id != null) {
                 $(".activePlayer").removeClass("activePlayer");
@@ -779,7 +784,10 @@ function playStaged() {
             var cardCount = allCards.length + myTeam.played[key].clean + myTeam.played[key].wild;
             if (cardCount >= 7) {
                 var isClean = myTeam.played[key].wild == 0;
-                if (isClean) {
+                if (key === "W") {
+                    isClean = true;
+                } else if (key !== "W" && isClean) {
+                    // Check to make sure a wild wasn't put on a previously clean book to try to close it
                     for (var i = 0, ct = allCards.length; i < ct; i++) {
                         var c = allCards[i];
                         if ((c.name == "J" && c.suit == null) || c.name == "2") {
@@ -805,18 +813,20 @@ function playStaged() {
         for (key in staged) {
             if (staged[key].length > 0) {
                 isClean = true;
-                for (i = 0, ct = staged[key].length; i < ct; i++) {
-                    c = staged[key][i];
-                    var cardScore = 5;
-                    if ((c.name == "J" && c.suit == null) || c.name == "2") {
-                        isClean = false;
-                    }
-                    if (c.name == "J" && c.suit == null) {
-                        score += 50;
-                    } else {
-                        if (["8", "9", "10", "J", "Q", "K"].indexOf(c.name) > -1) cardScore = 10;
-                        else if (c.name == "2" || c.name == "A") cardScore = 20;
-                        score += cardScore;
+                if (key != "W") {
+                    for (i = 0, ct = staged[key].length; i < ct; i++) {
+                        c = staged[key][i];
+                        var cardScore = 5;
+                        if ((c.name == "J" && c.suit == null) || c.name == "2") {
+                            isClean = false;
+                        }
+                        if (c.name == "J" && c.suit == null) {
+                            score += 50;
+                        } else {
+                            if (["8", "9", "10", "J", "Q", "K"].indexOf(c.name) > -1) cardScore = 10;
+                            else if (c.name == "2" || c.name == "A") cardScore = 20;
+                            score += cardScore;
+                        }
                     }
                 }
                 if (isClean) hasClean = true;
