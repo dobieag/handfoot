@@ -88,7 +88,9 @@ exports.draw = async (gameid, userid) => {
     var player = await db.getData(gameid, userid);
     player.didDraw = true;
     player.hand.push(drawPile.shift());
-    player.hand.push(drawPile.shift());
+    var last = drawPile.shift();
+    player.hand.push(last);
+    player.lastDrawIndex = last.idx;
     await db.setDataByItem(player);
 
     var nextDrawerId = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.lastDrawer) + 1) % gameData.playOrder.length];

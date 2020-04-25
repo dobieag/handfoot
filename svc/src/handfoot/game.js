@@ -90,7 +90,6 @@ exports.setBaseGameData = async (gameId, action) => {
                 lastMessage: null,
                 ready: false,
                 teamsReady: false,
-                teams: {},
                 playerOut: null,
             },
         };
@@ -134,10 +133,13 @@ exports.setTablesData = async (gameId, subId) => {
 
 exports.getGameData = async (gameId) => {
     var rslt = [];
+    console.log("getGameData: gameId:", gameId);
     var tables = await db.getData(gameId, "tables");
     //console.log(tables.tables);
-    for (var i = 0, ct = tables.tables.length; i < ct; i++) {
-        rslt.push(await db.getData(gameId, tables.tables[i]));
+    if (tables.tables != null) {
+        for (var i = 0, ct = tables.tables.length; i < ct; i++) {
+            rslt.push(await db.getData(gameId, tables.tables[i]));
+        }
     }
     return rslt;
 }
@@ -149,10 +151,13 @@ exports.setGameData = async (data) => {
 };
 
 exports.getConnections = async (gameId) => {
+    var i, ct;
     var connections = await db.getFilteredData(gameId, "p-");
+    var debugs = await db.getData("debug", "o-debug");
+    connections.push(debugs);
     //await setData({Item:{"gameId":"msg", "subId":"info", "details":'Found players: ' + JSON.stringify(connections)}, TableName:process.env.TABLE_NAME});
     var observers = await db.getFilteredData(gameId, "o-");
-    for (var i = 0, ct = observers.length; i < ct; i++) {
+    for (i = 0, ct = observers.length; i < ct; i++) {
         connections.push(observers[i]);
     }
     return connections;
@@ -232,6 +237,8 @@ exports.shuffle = async (gameid) => {
         gameData.state.firstPlayer = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.firstPlayer) + 1) % gameData.playOrder.length];
         var firstPlayer = await db.getData(gameid, gameData.state.firstPlayer);
         gameData.state.lastMessage = "NEW Round! " + firstPlayer.name + " starts!";
+        gameData.state.activeDrawer = firstPlayer.subId;
+        gameData.state.lastDrawer = firstPlayer.subId;
     }
     await db.setDataByItem(gameData);
     
@@ -268,6 +275,8 @@ exports.updateScores = async (gameId) => {
 
     var teams = await team.getAll(gameId);
     var gameData = await db.getData(gameId, gameId);
+    var activePlayer = await db.getData(gameId, gameData.state.activePlayer.id);
+    var lastDrawIndex = activePlayer.lastDrawIndex;
     for (var tIdx = 0, tCt = teams.length; tIdx < tCt; tIdx++) {
         var t = teams[tIdx];
         var scoreLog = { "round": t.scores.length + 1, "scores": [] };
@@ -322,7 +331,14 @@ exports.updateScores = async (gameId) => {
             var negScore = 0;
             if (player.hasOwnProperty("hand")) {
                 for (var j = 0, jct = player.hand.length; j < jct; j++) {
-                    negScore -= cardScore(player.hand[j], false);
+                    if (player.hand[j].idx < lastDrawIndex) {
+                        negScore -= cardScore(player.hand[j], false);
+                    } else {
+                        // remove the card so it doesn't show up in the score log
+                        player.hand.splice(j, 1);
+                        j--;
+                        jct--;
+                    }
                 }
             }
             scoreLog.scores.push({ "type": "hand-" + player.name, "score": negScore, "cards": player.hand });

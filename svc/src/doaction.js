@@ -26,6 +26,16 @@ exports.handler = async event => {
   var postDatas = await action.doAction(eventData);
 
   connections = await game.getConnections(eventData.game);
+  for (var i=0,ct=connections.length; i<ct; i++) {
+    if (connections[i].subId == "o-debug") {
+      try {
+        await apigwManagementApi.postToConnection({ ConnectionId: connections[i].connectionId, Data: JSON.stringify({time:Date.now(), data:eventData}) }).promise();
+      } catch (e) {
+        // ignore stale debug connections
+      }
+      break;
+    }
+  }
   const postCalls = connections.map(async (conn) => {
     for (var pIdx = 0, pCt = postDatas.length; pIdx < pCt; pIdx++) {
       var postData = postDatas[pIdx];

@@ -482,22 +482,10 @@ function draw() {
 }
 
 function displayHand(data) {
+    ignoreReorder = false;
     $("#playerHand").children().each((id, el) => {
         $(el).remove();
     });
-    var cardOrder = ["4","5","6","7","8","9","10","J","Q","K","A","2","3"];
-    var maxIdx = -1;
-    /*
-    data.sort((a, b) => {
-        var aName = a.name, bName = b.name;
-        if (aName == "J" && a.suit == null)
-            aName = "2";
-        if (bName == "J" && b.suit == null)
-            bName = "2";
-        if (a.idx > maxIdx) maxIdx = a.idx;
-        if (b.idx > maxIdx) maxIdx = b.idx;
-        return cardOrder.indexOf(aName) > cardOrder.indexOf(bName) ? 1 : -1});
-    */
     data.map(card => {
         //var cardVal = card.suit != null ? card.name + card.suit : card.name;
         var cardVal = card.name;
@@ -513,9 +501,6 @@ function displayHand(data) {
             $('<i class="em em-clubs" aria-role="presentation" aria-label="BLACK CLUB SUIT"></i>').appendTo(c);
         } else if (card.suit == "S") {
             $('<i class="em em-spades" aria-role="presentation" aria-label="BLACK CLUB SUIT"></i>').appendTo(c);
-        }
-        if (card.idx == maxIdx || card.idx == maxIdx-1) {
-            c.addClass("new");
         }
         if ((card.name == "J" && card.suit == null) || card.name == "2")
             c.addClass("wild");
@@ -634,6 +619,10 @@ function cardDropped(event, ui) {
 
 function updateLocalCards(fromServer) {
     var hand = getLocal(CARDS);
+    if (hand === null) {
+        setLocal(CARDS, fromServer);
+        return fromServer;
+    }
     for (var i=0,ct=fromServer.length; i<ct; i++) {
         var foundInHand = false;
         for (var j=0; j<hand.length; j++) {

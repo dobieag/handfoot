@@ -44,9 +44,11 @@ exports.getFilteredData = async (gameId, name) => {
   var rslt = [];
   var tables = await module.exports.getData(gameId, "tables");
   //console.log("TABLES", tables);
-  for (var i = 0, ct = tables.tables.length; i < ct; i++) {
-    if (tables.tables[i].indexOf(name) > -1) {
-      rslt.push(await module.exports.getData(gameId, tables.tables[i]));
+  if (tables.hasOwnProperty("tables")) {
+    for (var i = 0, ct = tables.tables.length; i < ct; i++) {
+      if (tables.tables[i].indexOf(name) > -1) {
+        rslt.push(await module.exports.getData(gameId, tables.tables[i]));
+      }
     }
   }
   return rslt;

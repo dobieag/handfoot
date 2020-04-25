@@ -64,19 +64,25 @@
             };
             socket.onmessage = (event) => {
                 var data = JSON.parse(event.data);
-                switch(data.info){
-                    case "keepalive":
-                    lastKeepalive = Date.now();
-                    break;
-                    case "_games_":
-                        updateGames(data.data);
+                if (data.hasOwnProperty("info")) {
+                    switch(data.info){
+                        case "keepalive":
+                        lastKeepalive = Date.now();
                         break;
-                    case "_game_deleted_":
-                        alert(data.data);
-                        break;
-                    case "_snapshot_":
-                        alert("snapshot created: " + data.data);
-                        break;
+                        case "_games_":
+                            updateGames(data.data);
+                            break;
+                        case "_game_deleted_":
+                            alert(data.data);
+                            break;
+                        case "_snapshot_":
+                            alert("snapshot created: " + data.data);
+                            break;
+                    }
+                } else {
+                    if (event.data.indexOf("o-debug") == -1 && event.data.indexOf("keepalive") == -1) {
+                        $("#log").text( $("#log").text() + "\n" + event.data);
+                    }
                 }
             };
         }
@@ -99,6 +105,10 @@
             var game = $("#selGames").val();
             callSocket("_DELETE_GAME_", game);
         }
+        
+        function doClear(){
+            $("#log").text(" ");
+        }
     </script>
 </head>
 <body>
@@ -107,5 +117,7 @@
         <select id="selGames"></select>
         <button onclick="deleteGame()">Delete Game</button>
     </div>
+    <button onclick="doClear()">Clear</button>
+    <pre id="log"></pre>
 </body>
 </html>
