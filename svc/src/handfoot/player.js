@@ -70,7 +70,7 @@ exports.deal = async (gameid, userid) => {
     if (gameData.state.didDeal.length == gameData.playOrder.length) {
         gameData = await db.getData(gameid, gameid);
         gameData.state.activePlayer.id = gameData.state.firstPlayer;
-        var activePlayer = await db.getData(gameid, gameData.state.activePlayer);
+        var activePlayer = await db.getData(gameid, gameData.state.activePlayer.id);
         gameData.state.activePlayer.name = activePlayer.name;
         gameData.state.activePlayer.inFoot = false;
         gameData.state.activeDrawer = gameData.state.firstPlayer;

@@ -658,7 +658,6 @@ function updateLocalCards(fromServer) {
 }
 
 function updateCards(played) {
-    var score = 0;
     var staged = getLocal(STAGED);
     for (var key in played) {
         //var space = $("#space_" + key);
@@ -697,23 +696,24 @@ function updateCards(played) {
         }
 
         if (trackMeld) {
-            for (i = 0, ct = staged[key].length; i < ct; i++) {
-                var cardScore = 5;
-                var card = staged[key][i];
-                if (card.name == "J" && card.suit == null) {
-                    score += 50;
-                } else {
-                    if (["8", "9", "10", "J", "Q", "K"].indexOf(card.name) > -1) cardScore = 10;
-                    else if (card.name == "2" || card.name == "A") cardScore = 20;
-                    score += cardScore;
-                }
-            }
-            updateMelding(score);
+            updateMelding();
         }
     }
 }
 
-function updateMelding(score) {
+function updateMelding() {
+    var score = 0;
+    for (i = 0, ct = staged[key].length; i < ct; i++) {
+        var cardScore = 5;
+        var card = staged[key][i];
+        if (card.name == "J" && card.suit == null) {
+            score += 50;
+        } else {
+            if (["8", "9", "10", "J", "Q", "K"].indexOf(card.name) > -1) cardScore = 10;
+            else if (card.name == "2" || card.name == "A") cardScore = 20;
+            score += cardScore;
+        }
+    }
     var meldAmt = 50;
     if (myTeam.score > 1995) meldAmt = 90;
     if (myTeam.score > 3995) meldAmt = 120;
@@ -813,20 +813,18 @@ function playStaged() {
         for (key in staged) {
             if (staged[key].length > 0) {
                 isClean = true;
-                if (key != "W") {
-                    for (i = 0, ct = staged[key].length; i < ct; i++) {
-                        c = staged[key][i];
-                        var cardScore = 5;
-                        if ((c.name == "J" && c.suit == null) || c.name == "2") {
-                            isClean = false;
-                        }
-                        if (c.name == "J" && c.suit == null) {
-                            score += 50;
-                        } else {
-                            if (["8", "9", "10", "J", "Q", "K"].indexOf(c.name) > -1) cardScore = 10;
-                            else if (c.name == "2" || c.name == "A") cardScore = 20;
-                            score += cardScore;
-                        }
+                for (i = 0, ct = staged[key].length; i < ct; i++) {
+                    c = staged[key][i];
+                    var cardScore = 5;
+                    if (((c.name == "J" && c.suit == null) || c.name == "2") && (key != "W")) {
+                        isClean = false;
+                    }
+                    if (c.name == "J" && c.suit == null) {
+                        score += 50;
+                    } else {
+                        if (["8", "9", "10", "J", "Q", "K"].indexOf(c.name) > -1) cardScore = 10;
+                        else if (c.name == "2" || c.name == "A") cardScore = 20;
+                        score += cardScore;
                     }
                 }
                 if (isClean) hasClean = true;
@@ -843,7 +841,7 @@ function playStaged() {
         if (myTeam.score > 5995) meldAmt = 150;
         if (myTeam.score > 7995) meldAmt = 190;
         if (score < meldAmt) {
-            $("#dialog").text("You did not meet the minimum score to meld.").dialog();
+            $("#dialog").text("You only have " + score + " points and did not meet the minimum score of " + meldAmt + " to meld.").dialog();
             return;
         }
     }
@@ -982,7 +980,7 @@ function updateTeam(team) {
         if (!myTeam.melded) {
             trackMeld = true;
             $("#melding").show();
-            updateMelding(0);
+            updateMelding();
         } else {
             trackMeld = false;
             $("#melding").hide();

@@ -233,13 +233,18 @@ exports.shuffle = async (gameid) => {
     gameData.state.didDeal = [];
     if (gameData.state.firstPlayer == null) {
         gameData.state.firstPlayer = gameData.playOrder[0];
+        var firstPlayer = await db.getData(gameid, gameData.state.firstPlayer);
+        gameData.state.lastMessage = "NEW Game! " + firstPlayer.name + " starts!";
     } else {
         gameData.state.firstPlayer = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.firstPlayer) + 1) % gameData.playOrder.length];
         var firstPlayer = await db.getData(gameid, gameData.state.firstPlayer);
-        gameData.state.lastMessage = "NEW Round! " + firstPlayer.name + " starts!";
-        gameData.state.activeDrawer = firstPlayer.subId;
-        gameData.state.lastDrawer = firstPlayer.subId;
+        gameData.state.lastMessage = gameData.state.lastMessage + "<br />NEW Round! " + firstPlayer.name + " starts!";
     }
+    gameData.state.activeDrawer = firstPlayer.subId;
+    gameData.state.lastDrawer = firstPlayer.subId;
+    // gameData.state.activePlayer.id = firstPlayer.subId;
+    // gameData.state.activePlayer.name = firstPlayer.name;
+    // gameData.state.activePlayer.inFoot = false;
     await db.setDataByItem(gameData);
     
     var players = await player.getAll(gameid);
