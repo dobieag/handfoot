@@ -703,15 +703,18 @@ function updateCards(played) {
 
 function updateMelding() {
     var score = 0;
-    for (i = 0, ct = staged[key].length; i < ct; i++) {
-        var cardScore = 5;
-        var card = staged[key][i];
-        if (card.name == "J" && card.suit == null) {
-            score += 50;
-        } else {
-            if (["8", "9", "10", "J", "Q", "K"].indexOf(card.name) > -1) cardScore = 10;
-            else if (card.name == "2" || card.name == "A") cardScore = 20;
-            score += cardScore;
+    var staged = getLocal(STAGED);
+    for (var key in staged) {
+        for (var i = 0, ct = staged[key].length; i < ct; i++) {
+            var cardScore = 5;
+            var card = staged[key][i];
+            if (card.name == "J" && card.suit == null) {
+                score += 50;
+            } else {
+                if (["8", "9", "10", "J", "Q", "K"].indexOf(card.name) > -1) cardScore = 10;
+                else if (card.name == "2" || card.name == "A") cardScore = 20;
+                score += cardScore;
+            }
         }
     }
     var meldAmt = 50;
