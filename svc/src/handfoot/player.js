@@ -95,12 +95,24 @@ exports.draw = async (gameid, userid) => {
 
     var nextDrawerId = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.lastDrawer) + 1) % gameData.playOrder.length];
     var nextDrawer = await db.getData(gameid, nextDrawerId);
-    if (nextDrawer.partner != gameData.state.activePlayer.id) {
-        gameData.state.activeDrawer = nextDrawerId;
-        gameData.state.lastDrawer = nextDrawerId;
+    console.log(nextDrawer);
+    if (nextDrawer.hasOwnProperty("partner")) {
+        if (nextDrawer.partner != gameData.state.activePlayer.id) {
+            gameData.state.activeDrawer = nextDrawerId;
+            gameData.state.lastDrawer = nextDrawerId;
+        } else {
+            gameData.state.activeDrawer = null;
+        }
     } else {
-        gameData.state.activeDrawer = null;
+        // single player teams
+        if (nextDrawer.subId != gameData.state.activePlayer.id && !nextDrawer.didDraw) {
+            gameData.state.activeDrawer = nextDrawerId;
+            gameData.state.lastDrawer = nextDrawerId;
+        } else {
+            gameData.state.activeDrawer = null;
+        }
     }
+    console.log(gameData.state);
     await db.setDataByItem(gameData);
     
     var t = await db.getData(gameid, player.teamid);
@@ -163,11 +175,21 @@ exports.discard = async (gameid, userid, card) => {
             var nextDrawerId = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.lastDrawer) + 1) % gameData.playOrder.length];
             // console.log(nextDrawerId);
             var nextDrawer = await db.getData(gameid, nextDrawerId);
-            if (nextDrawer.partner != gameData.state.activePlayer.id) {
-                gameData.state.activeDrawer = nextDrawerId;
-                gameData.state.lastDrawer = nextDrawerId;
+            if (nextDrawer.hasOwnProperty("partner")) {
+                if (nextDrawer.partner != gameData.state.activePlayer.id) {
+                    gameData.state.activeDrawer = nextDrawerId;
+                    gameData.state.lastDrawer = nextDrawerId;
+                } else {
+                    gameData.state.activeDrawer = null;
+                }
             } else {
-                gameData.state.activeDrawer = null;
+                // single player teams
+                if (nextDrawer.subId != gameData.state.activePlayer.id && !nextDrawer.didDraw) {
+                    gameData.state.activeDrawer = nextDrawerId;
+                    gameData.state.lastDrawer = nextDrawerId;
+                } else {
+                    gameData.state.activeDrawer = null;
+                }
             }
         }
     }

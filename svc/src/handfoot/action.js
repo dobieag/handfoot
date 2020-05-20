@@ -195,7 +195,7 @@ exports.updateScores = async eventData => {
     var players = await player.getAll(eventData.game);
     var postDatas = [];
     for (var i = 0, ct = players.length; i < ct; i++) {
-        postDatas.push({ "info": "playerInfo", "to": players[i].userid, "data": player });
+        postDatas.push({ "info": "playerInfo", "to": players[i].subId, "data": players[i] });
     }
     //var teams = await team.getAll(eventData.game);
     //postDatas.push({ "info": "teams", "to": "all", "data": teams });

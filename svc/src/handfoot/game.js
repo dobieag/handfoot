@@ -153,13 +153,16 @@ exports.setGameData = async (data) => {
 exports.getConnections = async (gameId) => {
     var i, ct;
     var connections = await db.getFilteredData(gameId, "p-");
-    var debugs = await db.getData("debug", "o-debug");
-    connections.push(debugs);
-    //await setData({Item:{"gameId":"msg", "subId":"info", "details":'Found players: ' + JSON.stringify(connections)}, TableName:process.env.TABLE_NAME});
+    if (gameId !== "debug") {
+        var debugs = await db.getData("debug", "o-debug");
+        connections.push(debugs);
+    }
+    // await setData({Item:{"gameId":"msg", "subId":"info", "details":'Found players: ' + JSON.stringify(connections)}, TableName:process.env.TABLE_NAME});
     var observers = await db.getFilteredData(gameId, "o-");
     for (i = 0, ct = observers.length; i < ct; i++) {
         connections.push(observers[i]);
     }
+    // console.log(connections);
     return connections;
 }
 

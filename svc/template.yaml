@@ -164,6 +164,7 @@ Resources:
       CodeUri: src/
       Handler: doaction.handler
       MemorySize: 256
+      Timeout: 10
       Runtime: nodejs12.x
       Environment:
         Variables:
