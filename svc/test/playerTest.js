@@ -35,13 +35,13 @@ async function doTest() {
     // postDatas = [{ "info": "playerHand", "to": eventData.userid, "data": hand }];
     // console.log(postDatas);
 
-    // var evt = {"message":"doaction","game":{},"userid":"p-861-317","action":"getPlayers"};
-    // var datas = await action.doAction(evt);
-    // console.log(datas);
-
-    var evt = {"message":"doaction","game":"488-190","userid":"p-755-613","action":"play","value":{"4":[{"name":"2","id":122,"suit":"D","idx":44}],"5":[],"6":[],"7":[],"8":[],"9":[],"10":[],"J":[],"Q":[],"K":[],"A":[],"W":[]}};
+    var evt = {"message":"doaction","game":"102-822","userid":"p-929-784","action":"getPlayers"};
     var datas = await action.doAction(evt);
     console.log(datas);
+
+    // var evt = {"message":"doaction","game":"488-190","userid":"p-755-613","action":"play","value":{"4":[{"name":"2","id":122,"suit":"D","idx":44}],"5":[],"6":[],"7":[],"8":[],"9":[],"10":[],"J":[],"Q":[],"K":[],"A":[],"W":[]}};
+    // var datas = await action.doAction(evt);
+    // console.log(datas);
 }
 
 doTest();

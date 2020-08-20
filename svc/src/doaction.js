@@ -9,6 +9,7 @@ exports.handler = async event => {
     endpoint: event.requestContext.domainName + '/' + event.requestContext.stage
   });
   
+  //console.log("doaction.handler: " + JSON.stringify(event));
   const eventData = JSON.parse(event.body);
   /** VALIDATE message data required values **/
   if (typeof eventData.game === "undefined") {
@@ -26,43 +27,44 @@ exports.handler = async event => {
 
   var connections = await game.getConnections(eventData.game);
   
-  var debugCalls = [];
-  for (var i=0,ct=connections.length; i<ct; i++) {
-    var conn = connections[i];
+  const debugCalls = connections.map(async (conn) => {
     if (conn.subId == "o-debug") {
       try {
-        var p = apigwManagementApi.postToConnection({ ConnectionId: conn.connectionId, Data: JSON.stringify({time:Date.now(), data:eventData}) }).promise();
-        debugCalls.push(p);
+        await apigwManagementApi.postToConnection({ ConnectionId: conn.connectionId, Data: JSON.stringify({time:Date.now(), data:eventData}) }).promise();
       } catch (e) {
-        // ignore stale debug connections
+        // IGNORE STALE DEBUG CONNECTIONS
+        //console.log("ERROR POSTING DATA TO: " + connectionId);
       }
     }
-  };
-  console.log(debugCalls);
+  });
+
+  //console.log(JSON.stringify(debugCalls));
   /** Send all messages */
   try {
+    //console.log("calling all debugCalls");
     await Promise.all(debugCalls);
   } catch (e) {
     return { statusCode: 500, body: e.stack };
   }
-
+  
   try {
+    //console.log("calling action.doAction: " + JSON.stringify(eventData));
     var postDatas = await action.doAction(eventData);
   } catch (e) {
-    var errorCalls = [];
-    for (var i=0,ct=connections.length; i<ct; i++) {
-      var conn = connections[i];
+    const errorCalls = connections.map(async (conn) => {
       if (conn.subId == "o-debug") {
         try {
-          var p = apigwManagementApi.postToConnection({ ConnectionId: conn.connectionId, Data: JSON.stringify({time:Date.now(), data:"There was an error"}) }).promise();
-          errorCalls.push(p);
-        } catch (err) {
-          // ignore stale debug connections
+          await apigwManagementApi.postToConnection({ ConnectionId: conn.connectionId, Data: JSON.stringify({time:Date.now(), data:"There was an error"}) }).promise();
+        } catch (e) {
+          // IGNORE STALE DEBUG CONNECTIONS
+          //console.log("ERROR POSTING DATA TO: " + connectionId);
         }
       }
-    };
+    });
+
     // console.log(errorCalls);
     try {
+      console.log("sending all errorCalls");
       await Promise.all(errorCalls);
     } catch (err2) {
       // return { statusCode: 500, body: e.stack };
@@ -75,12 +77,12 @@ exports.handler = async event => {
       try {
         var connectionId = conn.connectionId;
         if (postData.to === "all" || postData.to == conn.subId) {
-          // console.log("POSTING DATA:", postData);
+          //console.log("POSTING DATA:", JSON.stringify(postData));
           await apigwManagementApi.postToConnection({ ConnectionId: connectionId, Data: JSON.stringify(postData) }).promise();
         }
       } catch (e) {
         // IGNORE STALE DEBUG CONNECTIONS
-        // console.log("ERROR POSTING DATA TO: " + connectionId);
+        //console.log("ERROR POSTING DATA TO: " + connectionId);
         // if (e.statusCode === 410) {
         //   console.log(`Found stale connection, deleting ${connectionId}`);
         // } else {
@@ -89,9 +91,10 @@ exports.handler = async event => {
       }
     }
   });
-  console.log(postCalls);
+  //console.log(JSON.stringify(postCalls));
   /** Send all messages */
   try {
+    //console.log("sending all postCalls");
     await Promise.all(postCalls);
   } catch (e) {
     return { statusCode: 500, body: e.stack };
