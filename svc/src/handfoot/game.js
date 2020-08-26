@@ -245,9 +245,9 @@ exports.shuffle = async (gameid) => {
     }
     gameData.state.activeDrawer = firstPlayer.subId;
     gameData.state.lastDrawer = firstPlayer.subId;
-    // gameData.state.activePlayer.id = firstPlayer.subId;
-    // gameData.state.activePlayer.name = firstPlayer.name;
-    // gameData.state.activePlayer.inFoot = false;
+    gameData.state.activePlayer.id = firstPlayer.subId;
+    gameData.state.activePlayer.name = firstPlayer.name;
+    gameData.state.activePlayer.inFoot = false;
     await db.setDataByItem(gameData);
     
     var players = await player.getAll(gameid);

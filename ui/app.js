@@ -142,6 +142,7 @@ function setupSocket(game, userid, name, action) {
             });
             break;
         case "state":
+            //debugger;
             gameState = data.data;
             if (data.data.hasOwnProperty("teams")) {
                 updateTeams(data.data.teams);
@@ -157,7 +158,7 @@ function setupSocket(game, userid, name, action) {
                     $("#btnDeal").show();
                 }
             }
-            if (gameState.activePlayer.id != null && gameState.activeDrawer == params.userid) {
+            if (gameState.activePlayer.id != null && gameState.activeDrawer == params.userid && !player.didDraw) {
                 $("#btnDraw").show();
             } else {
                 $("#btnDraw").hide();
@@ -178,7 +179,7 @@ function setupSocket(game, userid, name, action) {
                 $("[data-id='" + gameState.playerOut + "']").addClass("playerOut");
                 $("#btnDraw").hide();
                 $("#discard").hide();
-                $("#btnDeal").hide();
+//                $("#btnDeal").hide();
             }
             if (data.data.lastMessage) {
                 $("#lastPlay").html(data.data.lastMessage);
