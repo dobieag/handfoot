@@ -75,6 +75,8 @@ exports.save = async (gameid, teamList) => {
                 players[j].teamIdx = index;
                 players[j].teamid = teamid;
                 players[j].inFoot = false;
+                players[j].didDeal = false;
+                players[j].didDraw = false;
                 await db.setDataByItem(players[j]);
             }
             if (players[j].subId == ids[1]) {
@@ -82,11 +84,15 @@ exports.save = async (gameid, teamList) => {
                 players[j].teamIdx = index;
                 players[j].teamid = teamid;
                 players[j].inFoot = false;
+                players[j].didDeal = false;
+                players[j].didDraw = false;
                 await db.setDataByItem(players[j]);
             }
         }
     }
 
+    gameData.state.firstPlayer = null;
+    gameData.state.ready = false;
     gameData.state.teamsReady = true;
 
     gameData.playOrder = [];

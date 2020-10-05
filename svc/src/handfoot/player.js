@@ -55,7 +55,7 @@ exports.deal = async (gameid, userid) => {
                 player.hand = hand;
                 player.foot = foot;
                 player.didDraw = false;
-                player.canDraw = false;
+                player.didDeal = true;
                 gameData.state.didDeal.push(player.subId);
                 await db.setDataByItem(player);
 
@@ -63,12 +63,13 @@ exports.deal = async (gameid, userid) => {
                 t.cardCt[t.playerIds.indexOf(player.subId)] = player.hand.length;
                 await db.setDataByItem(t);
             }
+            break;
         }
     };
-    await db.setDataByItem(gameData);
-
+    
     if (gameData.state.didDeal.length == gameData.playOrder.length) {
-        gameData = await db.getData(gameid, gameid);
+        console.log("Dealing all done!");
+        gameData.state.activeDealer = null;
         gameData.state.activePlayer.id = gameData.state.firstPlayer;
         var activePlayer = await db.getData(gameid, gameData.state.activePlayer.id);
         gameData.state.activePlayer.name = activePlayer.name;
@@ -76,9 +77,12 @@ exports.deal = async (gameid, userid) => {
         gameData.state.activeDrawer = gameData.state.firstPlayer;
         gameData.state.lastDrawer = gameData.state.firstPlayer;
         gameData.state.ready = true;
-        await db.setDataByItem(gameData);
+    } else {
+        gameData.state.activeDealer = module.exports.getNextDealer(gameData);
+        console.log("Setting activeDealer to: " + gameData.state.activeDealer);
     }
-
+    await db.setDataByItem(gameData);
+    
     return hand;
 }
 
@@ -197,6 +201,18 @@ exports.discard = async (gameid, userid, card) => {
     await db.setDataByItem(gameData);
     
     return player.hand;
+}
+
+exports.getNextDealer = (gameData) => {
+    var list = [];
+    for (var i = 0, ct = gameData.playOrder.length; i < ct; i++) {
+        if (gameData.state.didDeal.indexOf(gameData.playOrder[i]) == -1) {
+            list.push(gameData.playOrder[i]);
+        }
+    }
+    console.log(JSON.stringify(list));
+    var idx = Math.floor(Math.random() * Math.floor(list.length));
+    return list[idx];
 }
 
 exports.play = async (gameid, userid, cards) => {

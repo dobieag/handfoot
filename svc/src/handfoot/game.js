@@ -243,6 +243,8 @@ exports.shuffle = async (gameid) => {
         var firstPlayer = await db.getData(gameid, gameData.state.firstPlayer);
         gameData.state.lastMessage = gameData.state.lastMessage + "<br />NEW Round! " + firstPlayer.name + " starts!";
     }
+    gameData.state.activeDealer = player.getNextDealer(gameData);
+    console.log("Setting activeDealer to: " + gameData.state.activeDealer);
     gameData.state.activeDrawer = firstPlayer.subId;
     gameData.state.lastDrawer = firstPlayer.subId;
     gameData.state.activePlayer.id = firstPlayer.subId;
@@ -254,6 +256,8 @@ exports.shuffle = async (gameid) => {
     players.map(async (p) => {
         delete p["hand"];
         delete p["foot"];
+        p.didDeal = false;
+        p.didDraw = false;
         await db.setDataByItem(p);
     });
 

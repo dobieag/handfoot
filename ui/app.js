@@ -154,11 +154,14 @@ function setupSocket(game, userid, name, action) {
                 clearTable();
             }
             if (data.data.shuffled) {
-                if (player != null && !player.hasOwnProperty("hand")) {
+                //if (player != null && !player.hasOwnProperty("hand")) {
+                //debugger;
+                if (player != null && params.userid == gameState.activeDealer && !player.didDeal) {
                     $("#btnDeal").show();
                 }
             }
-            if (gameState.activePlayer.id != null && gameState.activeDrawer == params.userid && !player.didDraw) {
+            //debugger;
+            if (gameState.activePlayer.id != null && gameState.activeDrawer == params.userid && gameState.ready && !player.didDraw) {
                 $("#btnDraw").show();
             } else {
                 $("#btnDraw").hide();
@@ -185,6 +188,7 @@ function setupSocket(game, userid, name, action) {
                 $("#lastPlay").html(data.data.lastMessage);
                 if (data.data.lastMessage.indexOf("into their foot") > -1 && data.data.lastMessage != lastMessage) {
                     $("#tadaF").trigger('play');
+                    //alert("hooray");
                 }
                 lastMessage = data.data.lastMessage;
             }
@@ -199,7 +203,7 @@ function setupSocket(game, userid, name, action) {
             $("#lblPlayerName").html(player.name);
             if (data.data.hasOwnProperty("hand")) {
                 $("#btnDeal").hide();
-                var staged = getLocal(STAGED);
+                //var staged = getLocal(STAGED);
                 
                 if (player.didDraw && !hasStaged()) {
                     $("#discard").show();
