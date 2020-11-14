@@ -102,10 +102,18 @@ exports._RESTORE_SNAPSHOT_ = async eventData => {
 }
 
 exports.deal = async eventData => {
-    var hand = await player.deal(eventData.game, eventData.userid);
-    var rslt = [{ "info": "playerHand", "to": eventData.userid, "data": hand }];
-    var state = await game.getState(eventData.game);
-    rslt.push({ "info": "state", "to": "all", "data": state });
+    var didDeal = await player.deal(eventData.game, eventData.userid);
+    var rslt = [];
+    if (didDeal) {
+        var players = await player.getAll(eventData.game);
+        for (var idx=0, ct=players.length; idx<ct; idx++) {
+            var p = players[idx];
+            //console.log(p.hand);
+            rslt.push({"info":"playerHand", "to":p.subId, "data":p.hand});
+        }
+        var state = await game.getState(eventData.game);
+        rslt.push({ "info": "state", "to": "all", "data": state });
+    }
     return rslt;
 }
 
@@ -196,16 +204,18 @@ exports.shuffle = async eventData => {
 
 exports.updateScores = async eventData => {
     await game.updateScores(eventData.game);
-    var players = await player.getAll(eventData.game);
     var postDatas = [];
-    for (var i = 0, ct = players.length; i < ct; i++) {
-        postDatas.push({ "info": "playerInfo", "to": players[i].subId, "data": players[i] });
-    }
     //var teams = await team.getAll(eventData.game);
     //postDatas.push({ "info": "teams", "to": "all", "data": teams });
     //var state = await game.getState(eventData.game);
     await game.shuffle(eventData.game);
-    var state = await game.getState(eventData.game);
-    postDatas.push({ "info": "state", "to": "all", "data": state });
+
+    var players = await player.getAll(eventData.game);
+    for (var i = 0, ct = players.length; i < ct; i++) {
+        postDatas.push({ "info": "playerInfo", "to": players[i].subId, "data": players[i] });
+    }
+    
+    //var state = await game.getState(eventData.game);
+    //postDatas.push({ "info": "state", "to": "all", "data": state });
     return postDatas;
 }

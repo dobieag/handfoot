@@ -131,7 +131,7 @@ exports.setTablesData = async (gameId, subId) => {
         tableData = {
             gameId: gameId,
             subId: "tables",
-            tables: ["tables", gameId]  // Prep it with the tables and gameId values so they will get deleted correctly
+            tables: ["tables", "drawPile", gameId]  // Prep it with the tables, drawPile and gameId values so they will get deleted correctly
         }
     }
     if (tableData.tables.indexOf(subId) == -1) {
@@ -243,7 +243,8 @@ exports.shuffle = async (gameid) => {
     for (i=0,ct=drawPile.length; i<ct; i++) {
         drawPile[i].idx = i;
     }
-    gameData.drawPile = drawPile;
+    await db.setDataByItem({"gameId":gameid, "subId":"drawPile", "drawPile":drawPile});
+    
     gameData.state.shuffled = true;
     gameData.state.drawIndex = 0;
     gameData.state.didDeal = [];
@@ -256,8 +257,6 @@ exports.shuffle = async (gameid) => {
         var firstPlayer = await db.getData(gameid, gameData.state.firstPlayer);
         gameData.state.lastMessage = gameData.state.lastMessage + "<br />NEW Round! " + firstPlayer.name + " starts!";
     }
-    //gameData.state.activeDealer = player.getNextDealer(gameData);
-    //console.log("Setting activeDealer to: " + gameData.state.activeDealer);
     gameData.state.activeDrawer = firstPlayer.subId;
     gameData.state.lastDrawer = firstPlayer.subId;
     gameData.state.activePlayer.id = firstPlayer.subId;

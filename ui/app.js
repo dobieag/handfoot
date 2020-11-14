@@ -480,6 +480,7 @@ function storeName() {
 */
 
 function deal() {
+    player.didDeal = true;
     $("#btnDeal").hide();
     callSocket("deal");
 }

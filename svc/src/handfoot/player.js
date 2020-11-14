@@ -45,6 +45,7 @@ exports.deal = async (gameid, userid) => {
         if (player.subId === userid) {
             if (player.dealTime === 0) {
                 // player hasn't dealt
+                player.didDeal = true;
                 player.dealTime = new Date().getTime();
                 await db.setDataByItem(player);
             }
@@ -62,6 +63,7 @@ exports.deal = async (gameid, userid) => {
     }
 
     //console.log("dealCt: " + dealCt);
+    var didDeal = false;
     if (dealCt > 0) {
         if (dealCt == players.length) {
             players.sort(function(a, b) {
@@ -70,18 +72,19 @@ exports.deal = async (gameid, userid) => {
             // check if the last user to deal is the current one and then deal
             if (players[players.length-1].subId === userid) {
             //if (players[0].subId === userid) {
-                console.log("Dealing starting...");
+                //console.log("Dealing starting...");
+                didDeal = true;
                 var gameData = await db.getData(gameid, gameid);
-                var drawPile = gameData.drawPile;
-                console.log(players);
+                var drawPile = await db.getData(gameid, "drawPile");
+                //console.log(players);
                 for (var i=0, ct = players.length; i < ct; i++) {
                     var player = players[i];
-                    console.log("Dealing: " + player.name);
+                    //console.log("Dealing: " + player.name);
                     var hand = [];
                     var foot = [];
                     for (var j = 0; j < 11; j++) {
-                        hand.push(drawPile.shift());
-                        foot.push(drawPile.shift());
+                        hand.push(drawPile.drawPile.shift());
+                        foot.push(drawPile.drawPile.shift());
                     }
                     player.hand = hand;
                     player.foot = foot;
@@ -94,9 +97,9 @@ exports.deal = async (gameid, userid) => {
                     t.cardCt[t.playerIds.indexOf(player.subId)] = player.hand.length;
                     await db.setDataByItem(t);
                 }
+                await db.setDataByItem(drawPile);
 
-                console.log("Dealing all done!");
-                //gameData.state.activeDealer = null;
+                //console.log("Dealing all done!");
                 gameData.state.activePlayer.id = gameData.state.firstPlayer;
                 var activePlayer = await db.getData(gameid, gameData.state.activePlayer.id);
                 gameData.state.activePlayer.name = activePlayer.name;
@@ -108,67 +111,20 @@ exports.deal = async (gameid, userid) => {
             }
         }
     }
-}
-
-exports.deal_old = async (gameid, userid) => {
-    var gameData = await db.getData(gameid, gameid);
-    var drawPile = gameData.drawPile;
-    var hand = [];
-    var foot = [];
-    for (var i = 0; i < 11; i++) {
-        hand.push(drawPile.shift());
-        foot.push(drawPile.shift());
-    }
-    
-    var players = await module.exports.getAll(gameid);
-    for (var i = 0, ct = players.length; i < ct; i++) {
-        var player = players[i];
-        if (player.subId === userid) {
-            if (gameData.state.didDeal.indexOf(player.subId) == -1) {
-                player.hand = hand;
-                player.foot = foot;
-                player.didDraw = false;
-                player.didDeal = true;
-                gameData.state.didDeal.push(player.subId);
-                await db.setDataByItem(player);
-
-                var t = await db.getData(gameid, player.teamid);
-                t.cardCt[t.playerIds.indexOf(player.subId)] = player.hand.length;
-                await db.setDataByItem(t);
-            }
-            break;
-        }
-    };
-    
-    if (gameData.state.didDeal.length == gameData.playOrder.length) {
-        console.log("Dealing all done!");
-        gameData.state.activeDealer = null;
-        gameData.state.activePlayer.id = gameData.state.firstPlayer;
-        var activePlayer = await db.getData(gameid, gameData.state.activePlayer.id);
-        gameData.state.activePlayer.name = activePlayer.name;
-        gameData.state.activePlayer.inFoot = false;
-        gameData.state.activeDrawer = gameData.state.firstPlayer;
-        gameData.state.lastDrawer = gameData.state.firstPlayer;
-        gameData.state.ready = true;
-    } else {
-        gameData.state.activeDealer = module.exports.getNextDealer(gameData);
-        console.log("Setting activeDealer to: " + gameData.state.activeDealer);
-    }
-    await db.setDataByItem(gameData);
-    
-    return hand;
+    return didDeal;
 }
 
 exports.draw = async (gameid, userid) => {
     var gameData = await db.getData(gameid, gameid);
-    var drawPile = gameData.drawPile;
+    var drawPile = await db.getData(gameid, "drawPile");
     var player = await db.getData(gameid, userid);
     player.didDraw = true;
-    player.hand.push(drawPile.shift());
-    var last = drawPile.shift();
+    player.hand.push(drawPile.drawPile.shift());
+    var last = drawPile.drawPile.shift();
     player.hand.push(last);
     player.lastDrawIndex = last.idx;
     await db.setDataByItem(player);
+    await db.setDataByItem(drawPile);
 
     var nextDrawerId = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.lastDrawer) + 1) % gameData.playOrder.length];
     var nextDrawer = await db.getData(gameid, nextDrawerId);
