@@ -156,7 +156,7 @@ function setupSocket(game, userid, name, action) {
             if (data.data.shuffled) {
                 //if (player != null && !player.hasOwnProperty("hand")) {
                 //debugger;
-                if (player != null && params.userid == gameState.activeDealer && !player.didDeal) {
+                if (player != null && !player.didDeal) {
                     $("#btnDeal").show();
                 }
             }
@@ -920,6 +920,11 @@ function doShuffle() {
 
 function updatePersonList(allNames) {
     //names = names;
+    if ($(".cbPlayer option").length == 0) {
+        $(".cbPlayer").each(function () {
+            $(this).append($("<option value='0'></option>"));
+        });
+    }
     for (var i = 0, ct = allNames.length; i < ct; i++) {
         var found = false;
         for (var j = 0, jCt = names.length; j < jCt; j++) {
@@ -930,22 +935,10 @@ function updatePersonList(allNames) {
         }
         if (!found) {
             names.push(allNames[i]);
+            $(".cbPlayer").each(function () {
+                $(this).append($("<option value='" + allNames[i].id + "'>" + allNames[i].name + "</option>"));
+            });
         }
-    }
-    $(".cbPlayer option").each(function () {
-        $(this).remove();
-    });
-    var tNames = [{
-        "name": "",
-        id: "0"
-    }];
-    for (i = 0, ct = names.length; i < ct; i++) {
-        tNames.push(names[i]);
-    }
-    for (i = 0, ct = tNames.length; i < ct; i++) {
-        $(".cbPlayer").each(function () {
-            $(this).append($("<option value='" + tNames[i].id + "'>" + tNames[i].name + "</option>"));
-        });
     }
     $(".teamSetup select").selectmenu("refresh");
 }

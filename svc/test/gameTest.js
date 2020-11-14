@@ -107,7 +107,7 @@ async function doTest() {
     // postDatas.push({ "info": "state", "to": "all", "data": state });
 
     // wss://l6xhw95zuk.execute-api.us-east-2.amazonaws.com/Prod?game=48b-697&action=test
-    var gameId = "163-119";
+    var gameId = "053-687";
     var userId;
     var connectionId;
     var name;
@@ -115,8 +115,8 @@ async function doTest() {
     //await game.connect(gameId, userId, connectionId, name, action);
     //console.log(await action.doAction({"message":"doaction","game":"023-500","userid":"p-281-974","action":"getScores"}));
     setTimeout(async function(){
-        var tables = await game.getGameData(gameId);
-        console.log(tables);
+        //var tables = await game.getGameData(gameId);
+        //console.log(tables);
 
         //await game.shuffle(gameId);
         // var rslt = await action.doAction({"message":"doaction","game":"224-812","userid":"p-690-435","action":"discard","value":{"name":"7","id":73,"suit":"D","idx":55}});
@@ -138,6 +138,21 @@ async function doTest() {
         // await action.doAction({"message":"doaction","game":"629-636","userid":"p-778-006","action":"discard","value":{"name":"3","id":123,"suit":"D","idx":66}});
 
         // await action.doAction({"message":"doaction","game":"629-636","userid":"p-240-643","action":"discard","value":{"name":"3","id":136,"suit":"C","idx":34}});
+
+        await game.shuffle("053-687");
+        console.log("SHUFFLED");
+        setTimeout(async function(){
+            await player.deal("053-687", "p-771-517");
+        }, 500);
+        setTimeout(async function(){
+            await player.deal("053-687", "p-885-239");
+        }, 1000);
+        setTimeout(async function(){
+            await player.deal("053-687", "p-610-729");
+        }, 1500);
+        setTimeout(async function(){
+            await player.deal("053-687", "p-517-825");
+        }, 2000);
     }, 1000);
 }
 

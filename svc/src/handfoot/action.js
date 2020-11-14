@@ -97,6 +97,10 @@ exports._SNAPSHOT_ = async eventData => {
     return [{ "info": "_snapshot_", "to": "all", "data": n.toString() }];
 }
 
+exports._RESTORE_SNAPSHOT_ = async eventData => {
+    await game.restoreSnapshot(eventData.game, eventData.snapId);
+}
+
 exports.deal = async eventData => {
     var hand = await player.deal(eventData.game, eventData.userid);
     var rslt = [{ "info": "playerHand", "to": eventData.userid, "data": hand }];

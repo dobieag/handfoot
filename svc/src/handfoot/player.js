@@ -1,4 +1,5 @@
 const db = require("./db");
+const game = require("./game");
 
 exports.getAllNames = async (gameId) => {
     let names = [];
@@ -38,6 +39,78 @@ exports.delete = async (gameId, userId) => {
 }
 
 exports.deal = async (gameid, userid) => {
+    var players = await module.exports.getAll(gameid);
+    for (var i = 0, ct = players.length; i < ct; i++) {
+        var player = players[i];
+        if (player.subId === userid) {
+            if (player.dealTime === 0) {
+                // player hasn't dealt
+                player.dealTime = new Date().getTime();
+                await db.setDataByItem(player);
+            }
+        }
+    }
+    
+    var dealCt = 0;
+    players = await module.exports.getAll(gameid);
+    for (var i = 0, ct = players.length; i < ct; i++) {
+        var player = players[i];
+        if (player.dealTime !== 0) {
+            //console.log(player.dealTime);
+            dealCt++;
+        }
+    }
+
+    //console.log("dealCt: " + dealCt);
+    if (dealCt > 0) {
+        if (dealCt == players.length) {
+            players.sort(function(a, b) {
+                return a.dealTime - b.dealTime;
+            });
+            // check if the last user to deal is the current one and then deal
+            if (players[players.length-1].subId === userid) {
+            //if (players[0].subId === userid) {
+                console.log("Dealing starting...");
+                var gameData = await db.getData(gameid, gameid);
+                var drawPile = gameData.drawPile;
+                console.log(players);
+                for (var i=0, ct = players.length; i < ct; i++) {
+                    var player = players[i];
+                    console.log("Dealing: " + player.name);
+                    var hand = [];
+                    var foot = [];
+                    for (var j = 0; j < 11; j++) {
+                        hand.push(drawPile.shift());
+                        foot.push(drawPile.shift());
+                    }
+                    player.hand = hand;
+                    player.foot = foot;
+                    player.didDraw = false;
+                    player.didDeal = true;
+                    gameData.state.didDeal.push(player.subId);
+                    await db.setDataByItem(player);
+
+                    var t = await db.getData(gameid, player.teamid);
+                    t.cardCt[t.playerIds.indexOf(player.subId)] = player.hand.length;
+                    await db.setDataByItem(t);
+                }
+
+                console.log("Dealing all done!");
+                //gameData.state.activeDealer = null;
+                gameData.state.activePlayer.id = gameData.state.firstPlayer;
+                var activePlayer = await db.getData(gameid, gameData.state.activePlayer.id);
+                gameData.state.activePlayer.name = activePlayer.name;
+                gameData.state.activePlayer.inFoot = false;
+                gameData.state.activeDrawer = gameData.state.firstPlayer;
+                gameData.state.lastDrawer = gameData.state.firstPlayer;
+                gameData.state.ready = true;
+                await db.setDataByItem(gameData);
+            }
+        }
+    }
+}
+
+exports.deal_old = async (gameid, userid) => {
     var gameData = await db.getData(gameid, gameid);
     var drawPile = gameData.drawPile;
     var hand = [];
@@ -99,7 +172,7 @@ exports.draw = async (gameid, userid) => {
 
     var nextDrawerId = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.lastDrawer) + 1) % gameData.playOrder.length];
     var nextDrawer = await db.getData(gameid, nextDrawerId);
-    console.log(nextDrawer);
+    //console.log(nextDrawer);
     if (nextDrawer.hasOwnProperty("partner")) {
         if (nextDrawer.partner != gameData.state.activePlayer.id) {
             gameData.state.activeDrawer = nextDrawerId;
@@ -116,7 +189,7 @@ exports.draw = async (gameid, userid) => {
             gameData.state.activeDrawer = null;
         }
     }
-    console.log(gameData.state);
+    //console.log(gameData.state);
     await db.setDataByItem(gameData);
     
     var t = await db.getData(gameid, player.teamid);
@@ -203,6 +276,7 @@ exports.discard = async (gameid, userid, card) => {
     return player.hand;
 }
 
+/*
 exports.getNextDealer = (gameData) => {
     var list = [];
     for (var i = 0, ct = gameData.playOrder.length; i < ct; i++) {
@@ -214,6 +288,7 @@ exports.getNextDealer = (gameData) => {
     var idx = Math.floor(Math.random() * Math.floor(list.length));
     return list[idx];
 }
+*/
 
 exports.play = async (gameid, userid, cards) => {
     var getCardIndex = function (ary, card) {
