@@ -86,28 +86,16 @@ exports.setBaseGameData = async (gameId, action) => {
             playOrder: [],
             state: {
                 drawIndex: 0,
-                activeDrawer: null,
-                lastDrawer: null,
                 firstPlayer: null,
                 shuffled: false,
-                activePlayer: {
-                    id:null,
-                    name: null,
-                    inFoot: false
-                },
-                didDeal: [],
                 lastMessage: null,
                 ready: false,
                 teamsReady: false,
                 playerOut: null,
             },
         };
-        //await db.setDataByItem({"gameId":gameId, "subId":"setBaseGameData_gameData", "data":gameData});
+        await db.setDataByItem(gameData);
     }
-
-    //gameData.Item.connectionId = event.requestContext.connectionId;
-    await db.setDataByItem(gameData);
-    //await db.setDataByItem({"gameId":gameId, "subId":"setBaseGameData_DONE", "data":gameData});
 };
 
 exports.setGamesData = async (gameId) => {
@@ -202,10 +190,18 @@ exports.deleteGameData = async (gameId) => {
 
 exports.getState = async (gameid) => {
     var data = await db.getData(gameid, gameid);
-    if (data.state.activePlayer.id != null) {
-        var activePlayer = await db.getData(gameid, data.state.activePlayer.id);
-        data.state.activePlayer.name = activePlayer.name;
-        data.state.activePlayer.inFoot = activePlayer.inFoot;
+    var players = await player.getAll(gameid);
+    for (var i=0,ct=players.length; i<ct; i++) {
+        if (players[i].isActivePlayer) {
+            data.state.activePlayer = {
+                "id":players[i].subId,
+                "name":players[i].name,
+                "inFoot":players[i].inFoot
+            };
+        }
+        if (players[i].isActiveDrawer) {
+            data.state.activeDrawer = players[i].subId;
+        }
     }
     //console.log("getting Team Overview");
     data.state.teams = await team.getOverview(gameid);
@@ -247,7 +243,6 @@ exports.shuffle = async (gameid) => {
     
     gameData.state.shuffled = true;
     gameData.state.drawIndex = 0;
-    gameData.state.didDeal = [];
     if (gameData.state.firstPlayer == null) {
         gameData.state.firstPlayer = gameData.playOrder[0];
         var firstPlayer = await db.getData(gameid, gameData.state.firstPlayer);
@@ -257,11 +252,6 @@ exports.shuffle = async (gameid) => {
         var firstPlayer = await db.getData(gameid, gameData.state.firstPlayer);
         gameData.state.lastMessage = gameData.state.lastMessage + "<br />NEW Round! " + firstPlayer.name + " starts!";
     }
-    gameData.state.activeDrawer = firstPlayer.subId;
-    gameData.state.lastDrawer = firstPlayer.subId;
-    gameData.state.activePlayer.id = firstPlayer.subId;
-    gameData.state.activePlayer.name = firstPlayer.name;
-    gameData.state.activePlayer.inFoot = false;
     gameData.state.ready = false;
     await db.setDataByItem(gameData);
     
@@ -269,6 +259,14 @@ exports.shuffle = async (gameid) => {
     players.map(async (p) => {
         delete p["hand"];
         delete p["foot"];
+        p.lastDrawTime = null;
+        if (p.subId == firstPlayer.subId) {
+            p.isActivePlayer = true;
+            p.isActiveDrawer = true;
+        } else {
+            p.isActivePlayer = false;
+            p.isActiveDrawer = false;
+        }
         p.didDeal = false;
         p.didDraw = false;
         p.dealTime = 0;

@@ -147,7 +147,7 @@ function setupSocket(game, userid, name, action) {
             if (data.data.hasOwnProperty("teams")) {
                 updateTeams(data.data.teams);
             }
-            if (!gameState.ready && gameState.didDeal.indexOf(params.userid) === -1) {  // Empty deal list means a new game
+            if (!gameState.ready && !player.didDeal) {  // Empty deal list means a new game
                 $("#playerHand").children().each((idx, ui) => {
                     $(ui).remove();
                 });

@@ -90,7 +90,6 @@ exports.deal = async (gameid, userid) => {
                     player.foot = foot;
                     player.didDraw = false;
                     player.didDeal = true;
-                    gameData.state.didDeal.push(player.subId);
                     await db.setDataByItem(player);
 
                     var t = await db.getData(gameid, player.teamid);
@@ -100,12 +99,6 @@ exports.deal = async (gameid, userid) => {
                 await db.setDataByItem(drawPile);
 
                 //console.log("Dealing all done!");
-                gameData.state.activePlayer.id = gameData.state.firstPlayer;
-                var activePlayer = await db.getData(gameid, gameData.state.activePlayer.id);
-                gameData.state.activePlayer.name = activePlayer.name;
-                gameData.state.activePlayer.inFoot = false;
-                gameData.state.activeDrawer = gameData.state.firstPlayer;
-                gameData.state.lastDrawer = gameData.state.firstPlayer;
                 gameData.state.ready = true;
                 await db.setDataByItem(gameData);
             }
@@ -115,38 +108,53 @@ exports.deal = async (gameid, userid) => {
 }
 
 exports.draw = async (gameid, userid) => {
+    //console.log("  DRAWING!");
     var gameData = await db.getData(gameid, gameid);
     var drawPile = await db.getData(gameid, "drawPile");
-    var player = await db.getData(gameid, userid);
+    var players = await module.exports.getAll(gameid);
+    var player = null;
+    var activePlayer = null;
+    for (var pIdx in players){
+        var p = players[pIdx];
+        //console.log("p.subId: " + p.subId + "  ==  " + userid);
+        if (p.subId == userid) {
+            player = p;
+        }
+        if (p.isActivePlayer) {
+            activePlayer = p;
+        }
+    }
+    
     player.didDraw = true;
+    player.lastDrawTime = new Date().getTime();
     player.hand.push(drawPile.drawPile.shift());
     var last = drawPile.drawPile.shift();
     player.hand.push(last);
+    player.isActiveDrawer = false
     player.lastDrawIndex = last.idx;
     await db.setDataByItem(player);
     await db.setDataByItem(drawPile);
 
-    var nextDrawerId = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.lastDrawer) + 1) % gameData.playOrder.length];
+    //console.log("  Player drawing is moving activeDrawer");
+    var nextDrawerId = gameData.playOrder[(gameData.playOrder.indexOf(player.subId) + 1) % gameData.playOrder.length];
     var nextDrawer = await db.getData(gameid, nextDrawerId);
     //console.log(nextDrawer);
     if (nextDrawer.hasOwnProperty("partner")) {
-        if (nextDrawer.partner != gameData.state.activePlayer.id) {
-            gameData.state.activeDrawer = nextDrawerId;
-            gameData.state.lastDrawer = nextDrawerId;
+        if (nextDrawer.partner != activePlayer.subId) {
+            nextDrawer.isActiveDrawer = true;
         } else {
-            gameData.state.activeDrawer = null;
+            nextDrawer.isActiveDrawer = false;
         }
     } else {
         // single player teams
-        if (nextDrawer.subId != gameData.state.activePlayer.id && !nextDrawer.didDraw) {
-            gameData.state.activeDrawer = nextDrawerId;
-            gameData.state.lastDrawer = nextDrawerId;
+        if (nextDrawer.subId != activePlayer.subId && !nextDrawer.didDraw) {
+            nextDrawer.isActiveDrawer = true;
         } else {
-            gameData.state.activeDrawer = null;
+            nextDrawer.isActiveDrawer = false;
         }
     }
     //console.log(gameData.state);
-    await db.setDataByItem(gameData);
+    await db.setDataByItem(nextDrawer);
     
     var t = await db.getData(gameid, player.teamid);
     t.cardCt[t.playerIds.indexOf(player.subId)] = player.hand.length;
@@ -187,6 +195,7 @@ exports.discard = async (gameid, userid, card) => {
     t.cardCt[t.playerIds.indexOf(player.subId)] = player.hand.length;
     await db.setDataByItem(t);
     player.didDraw = false;
+    player.isActivePlayer = false;
     await db.setDataByItem(player);
 
     //console.log("player.js: player IS out: " + gameData.state.playerOut);
@@ -194,36 +203,50 @@ exports.discard = async (gameid, userid, card) => {
         // console.log("setting up active player...");
         var activeIdx = gameData.playOrder.indexOf(player.subId);
         activeIdx = (activeIdx + 1) % gameData.playOrder.length;
-        gameData.state.activePlayer.id = gameData.playOrder[activeIdx];
-        var activePlayer = await db.getData(gameid, gameData.state.activePlayer.id);
-        gameData.state.activePlayer.name = activePlayer.name;
-        gameData.state.activePlayer.inFoot = activePlayer.inFoot;
-        // console.log("done");
+        var activePlayerId = gameData.playOrder[activeIdx];
+        var activePlayer = await db.getData(gameid, activePlayerId);
+        activePlayer.isActivePlayer = true;
+        await db.setDataByItem(activePlayer);
 
-        //console.log(gameData.state);
-        var lastDrawer = await db.getData(gameid, gameData.state.lastDrawer);
-        //console.log(lastDrawer);
-        if (lastDrawer.didDraw) {
-            //console.log("lastDrawer did draw");
-            var nextDrawerId = gameData.playOrder[(gameData.playOrder.indexOf(gameData.state.lastDrawer) + 1) % gameData.playOrder.length];
+        var players = await module.exports.getAll(gameid);
+        var lastDrawTime = -1;
+        var lastDrawer = null;
+        var activeDrawer = null;
+        for (var pIdx in players){
+            var p = players[pIdx];
+            if (p.isActiveDrawer) {
+                activeDrawer = p;
+            }
+            if (typeof p.lastDrawTime !== "undefined") {
+                //console.log(p.subId + " => " + p.lastDrawTime);
+                if (p.lastDrawTime > lastDrawTime) {
+                    lastDrawTime = p.lastDrawTime;
+                    lastDrawer = p;
+                }
+            }
+        }
+        // The discard moving the activeDrawer should only happen if activeDrawer is null.
+        // Normally a player drawing will increment the activeDrawer
+        if (lastDrawer.didDraw && activeDrawer == null) {
+            //console.log("  Player discarding is moving activeDrawer");
+            var nextDrawerId = gameData.playOrder[(gameData.playOrder.indexOf(lastDrawer.subId) + 1) % gameData.playOrder.length];
             // console.log(nextDrawerId);
             var nextDrawer = await db.getData(gameid, nextDrawerId);
             if (nextDrawer.hasOwnProperty("partner")) {
-                if (nextDrawer.partner != gameData.state.activePlayer.id) {
-                    gameData.state.activeDrawer = nextDrawerId;
-                    gameData.state.lastDrawer = nextDrawerId;
+                if (nextDrawer.partner != activePlayer.subId) {
+                    nextDrawer.isActiveDrawer = true;
                 } else {
-                    gameData.state.activeDrawer = null;
+                    nextDrawer.isActiveDrawer = false;
                 }
             } else {
                 // single player teams
-                if (nextDrawer.subId != gameData.state.activePlayer.id && !nextDrawer.didDraw) {
-                    gameData.state.activeDrawer = nextDrawerId;
-                    gameData.state.lastDrawer = nextDrawerId;
+                if (nextDrawer.subId != activePlayer.subId && !nextDrawer.didDraw) {
+                    nextDrawer.isActiveDrawer = true;
                 } else {
-                    gameData.state.activeDrawer = null;
+                    nextDrawer.isActiveDrawer = false;
                 }
             }
+            await db.setDataByItem(nextDrawer);
         }
     }
     //console.log(gameData);
@@ -231,20 +254,6 @@ exports.discard = async (gameid, userid, card) => {
     
     return player.hand;
 }
-
-/*
-exports.getNextDealer = (gameData) => {
-    var list = [];
-    for (var i = 0, ct = gameData.playOrder.length; i < ct; i++) {
-        if (gameData.state.didDeal.indexOf(gameData.playOrder[i]) == -1) {
-            list.push(gameData.playOrder[i]);
-        }
-    }
-    console.log(JSON.stringify(list));
-    var idx = Math.floor(Math.random() * Math.floor(list.length));
-    return list[idx];
-}
-*/
 
 exports.play = async (gameid, userid, cards) => {
     var getCardIndex = function (ary, card) {
